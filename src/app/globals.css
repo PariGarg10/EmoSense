@@ -1,0 +1,202 @@
+@import url("https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500&family=JetBrains+Mono:wght@400&family=Nunito:wght@700;800&display=swap");
+
+@config "../../tailwind.config.ts";
+
+@import "tailwindcss";
+
+:root {
+  --emotion-bg: #0d1117;
+  --emotion-surface: #161c26;
+  --emotion-accent: #5b8def;
+  --emotion-text: #edf2ff;
+  --emotion-face-bg: #d5d8dc;
+  --bg-base: #0d1117;
+  --bg-surface: #161c26;
+  --bg-elevated: #1e2738;
+  --accent-primary: #5b8def;
+  --accent-warm: #f4a96a;
+  --accent-soft: #7ec8a4;
+  --accent-alert: #e07b7b;
+  --text-primary: #edf2ff;
+  --text-secondary: #8a9bb5;
+  --text-muted: #4a5568;
+  --border: rgba(91, 141, 239, 0.15);
+  --glow: rgba(91, 141, 239, 0.08);
+  --font-display: "Nunito", sans-serif;
+  --font-body: "DM Sans", sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+  --transition: 300ms ease-out;
+}
+
+[data-emotion="joy"],
+[data-emotion="happy"] {
+  --emotion-bg: #fff9e6;
+  --emotion-surface: #fff3cc;
+  --emotion-accent: #f5c518;
+  --emotion-text: #5a4200;
+  --emotion-face-bg: #ffe566;
+}
+
+[data-emotion="sadness"],
+[data-emotion="sad"] {
+  --emotion-bg: #e8f4fd;
+  --emotion-surface: #d1e9fa;
+  --emotion-accent: #4a90d9;
+  --emotion-text: #1a3a5c;
+  --emotion-face-bg: #aed6f1;
+}
+
+[data-emotion="anger"],
+[data-emotion="angry"] {
+  --emotion-bg: #fdeded;
+  --emotion-surface: #fad7d7;
+  --emotion-accent: #c0392b;
+  --emotion-text: #5c1a1a;
+  --emotion-face-bg: #f1948a;
+}
+
+[data-emotion="fear"],
+[data-emotion="fearful"] {
+  --emotion-bg: #f3eef8;
+  --emotion-surface: #e8ddf5;
+  --emotion-accent: #7d3c98;
+  --emotion-text: #3d1a5c;
+  --emotion-face-bg: #c39bd3;
+}
+
+[data-emotion="surprise"],
+[data-emotion="surprised"] {
+  --emotion-bg: #eafaf1;
+  --emotion-surface: #d5f5e3;
+  --emotion-accent: #1e8449;
+  --emotion-text: #0d3b22;
+  --emotion-face-bg: #82e0aa;
+}
+
+[data-emotion="disgust"],
+[data-emotion="disgusted"] {
+  --emotion-bg: #eafaf1;
+  --emotion-surface: #d4efdf;
+  --emotion-accent: #27ae60;
+  --emotion-text: #145a32;
+  --emotion-face-bg: #a9dfbf;
+}
+
+[data-emotion="calm"],
+[data-emotion="neutral"] {
+  --emotion-bg: #fdfefe;
+  --emotion-surface: #f2f3f4;
+  --emotion-accent: #717d7e;
+  --emotion-text: #2c3e50;
+  --emotion-face-bg: #d5d8dc;
+}
+
+[data-emotion="anxiety"] {
+  --emotion-bg: #fef5e7;
+  --emotion-surface: #fdebd0;
+  --emotion-accent: #e67e22;
+  --emotion-text: #5d3a00;
+  --emotion-face-bg: #fad7a0;
+}
+
+[data-emotion="loneliness"] {
+  --emotion-bg: #e8f8f5;
+  --emotion-surface: #d1f2eb;
+  --emotion-accent: #1abc9c;
+  --emotion-text: #0e4d40;
+  --emotion-face-bg: #76d7c4;
+}
+
+[data-emotion="confusion"],
+[data-emotion="confused"] {
+  --emotion-bg: #fdf2f8;
+  --emotion-surface: #f9ebea;
+  --emotion-accent: #e91e8c;
+  --emotion-text: #5c0a3a;
+  --emotion-face-bg: #f1a7d0;
+}
+
+[data-emotion="embarrassment"] {
+  --emotion-bg: #fff0f5;
+  --emotion-surface: #ffd6e7;
+  --emotion-accent: #e91e63;
+  --emotion-text: #5c0020;
+  --emotion-face-bg: #f48fb1;
+}
+
+[data-emotion="affection"] {
+  --emotion-bg: #fff0f5;
+  --emotion-surface: #fce4ec;
+  --emotion-accent: #e91e63;
+  --emotion-text: #880e4f;
+  --emotion-face-bg: #f48fb1;
+}
+
+[data-emotion="envy"] {
+  --emotion-bg: #e0f7fa;
+  --emotion-surface: #b2ebf2;
+  --emotion-accent: #00838f;
+  --emotion-text: #004d40;
+  --emotion-face-bg: #4dd0e1;
+}
+
+[data-emotion="ennui"] {
+  --emotion-bg: #ede7f6;
+  --emotion-surface: #d1c4e9;
+  --emotion-accent: #512da8;
+  --emotion-text: #1a0050;
+  --emotion-face-bg: #9575cd;
+}
+
+[data-emotion="acceptance"] {
+  --emotion-bg: #e3f2fd;
+  --emotion-surface: #bbdefb;
+  --emotion-accent: #1565c0;
+  --emotion-text: #0d2f6e;
+  --emotion-face-bg: #64b5f6;
+}
+
+[data-emotion="trust"] {
+  --emotion-bg: #fbe9e7;
+  --emotion-surface: #ffccbc;
+  --emotion-accent: #bf360c;
+  --emotion-text: #4e0000;
+  --emotion-face-bg: #ff8a65;
+}
+
+body {
+  transition:
+    background-color 600ms ease-out,
+    color 600ms ease-out;
+}
+
+*:focus-visible {
+  outline: 2px solid var(--emotion-accent, var(--accent-primary));
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+[data-font-size="large"] {
+  font-size: 18px;
+}
+
+[data-font-size="xl"] {
+  font-size: 20px;
+}
+
+[data-contrast="high"] {
+  --text-secondary: #c5d0e0;
+}
+
+[data-motion="none"] * {
+  animation: none !important;
+  transition: none !important;
+}
