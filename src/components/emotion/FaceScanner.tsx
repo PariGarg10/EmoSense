@@ -31,6 +31,7 @@ import {
   detectFromVideo,
   getTopEmotion,
   loadModels,
+  resetFaceModelsLoaded,
 } from "@/src/lib/face-api";
 import { useEmoSenseStore } from "@/lib/store";
 import clsx from "clsx";
@@ -48,6 +49,29 @@ const CHART_ORDER = [
   { apiKey: "disgusted" as const, themeKey: "disgust", label: "Disgust" },
   { apiKey: "neutral" as const, themeKey: "calm", label: "Calm" },
 ];
+
+async function acquireCameraStream(): Promise<MediaStream> {
+  if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
+    throw new Error("Camera is not supported in this browser.");
+  }
+  if (typeof window !== "undefined" && !window.isSecureContext) {
+    throw new Error("Camera needs HTTPS (or localhost). Open the app over a secure URL.");
+  }
+  const attempts: MediaStreamConstraints[] = [
+    { video: { facingMode: { ideal: "user" }, width: { ideal: 1280 } }, audio: false },
+    { video: { facingMode: "user" }, audio: false },
+    { video: true, audio: false },
+  ];
+  let last: unknown;
+  for (const constraints of attempts) {
+    try {
+      return await navigator.mediaDevices.getUserMedia(constraints);
+    } catch (e) {
+      last = e;
+    }
+  }
+  throw last instanceof Error ? last : new Error(String(last));
+}
 
 function resolveThemeLookup(emotion: string): string {
   const k = emotion.trim().toLowerCase();
@@ -132,6 +156,7 @@ export default function FaceScanner({ onResult }: FaceScannerProps) {
   const [explanation, setExplanation] = useState("");
   const [explanationLoading, setExplanationLoading] = useState(false);
   const [cameraError, setCameraError] = useState(false);
+  const [modelsLoadError, setModelsLoadError] = useState<string | null>(null);
   const [cameraBooting, setCameraBooting] = useState(false);
   const [showNoFaceHint, setShowNoFaceHint] = useState(false);
   const [uploadBusy, setUploadBusy] = useState(false);
@@ -142,6 +167,7 @@ export default function FaceScanner({ onResult }: FaceScannerProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const lastExpressionsRef = useRef<FaceExpressions | null>(null);
   const noFaceSinceRef = useRef<number | null>(null);
+  const startTickingRef = useRef<(() => void) | null>(null);
   const reduceMotion = useReducedMotion();
 
   const addActivity = useEmoSenseStore((s) => s.addActivity);
@@ -250,19 +276,59 @@ export default function FaceScanner({ onResult }: FaceScannerProps) {
     let intervalId: ReturnType<typeof setInterval> | null = null;
     setCameraBooting(true);
     setCameraError(false);
+    setModelsLoadError(null);
+    setModelsLoaded(false);
+    startTickingRef.current = null;
 
     let detachVideo: HTMLVideoElement | null = null;
 
+    const tick = async () => {
+      const v = videoRef.current;
+      if (!v || v.readyState < 2) return;
+      try {
+        const det = await detectFromVideo(v);
+        if (!det?.expressions) {
+          setFaceDetected(false);
+          setLiveEmotion(null);
+          lastExpressionsRef.current = null;
+          drawBox(null);
+          noFaceSinceRef.current ??= performance.now();
+          if (performance.now() - noFaceSinceRef.current >= 3000) {
+            setShowNoFaceHint(true);
+          }
+          return;
+        }
+        noFaceSinceRef.current = null;
+        setShowNoFaceHint(false);
+        setFaceDetected(true);
+        const top = getTopEmotion(det.expressions);
+        setLiveEmotion(top);
+        applyEmotionTheme(top.emotion);
+        lastExpressionsRef.current = det.expressions;
+        const box = det.detection.box;
+        drawBox({
+          x: box.x,
+          y: box.y,
+          width: box.width,
+          height: box.height,
+        });
+      } catch {
+        setFaceDetected(false);
+        drawBox(null);
+      }
+    };
+
+    const startTicking = () => {
+      if (intervalId) clearInterval(intervalId);
+      intervalId = setInterval(() => {
+        void tick();
+      }, 500);
+    };
+    startTickingRef.current = startTicking;
+
     async function boot() {
       try {
-        await loadModels();
-        if (cancelled) return;
-        setModelsLoaded(true);
-
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "user" },
-          audio: false,
-        });
+        const stream = await acquireCameraStream();
         if (cancelled) {
           stream.getTracks().forEach((t) => t.stop());
           return;
@@ -276,45 +342,21 @@ export default function FaceScanner({ onResult }: FaceScannerProps) {
         }
         setCameraBooting(false);
 
-        const tick = async () => {
-          const v = videoRef.current;
-          if (!v || v.readyState < 2) return;
-          try {
-            const det = await detectFromVideo(v);
-            if (!det?.expressions) {
-              setFaceDetected(false);
-              setLiveEmotion(null);
-              lastExpressionsRef.current = null;
-              drawBox(null);
-              noFaceSinceRef.current ??= performance.now();
-              if (performance.now() - noFaceSinceRef.current >= 3000) {
-                setShowNoFaceHint(true);
-              }
-              return;
-            }
-            noFaceSinceRef.current = null;
-            setShowNoFaceHint(false);
-            setFaceDetected(true);
-            const top = getTopEmotion(det.expressions);
-            setLiveEmotion(top);
-            applyEmotionTheme(top.emotion);
-            lastExpressionsRef.current = det.expressions;
-            const box = det.detection.box;
-            drawBox({
-              x: box.x,
-              y: box.y,
-              width: box.width,
-              height: box.height,
-            });
-          } catch {
-            setFaceDetected(false);
-            drawBox(null);
+        try {
+          await loadModels();
+          if (cancelled) return;
+          setModelsLoaded(true);
+          setModelsLoadError(null);
+          startTicking();
+        } catch {
+          if (!cancelled) {
+            resetFaceModelsLoaded();
+            setModelsLoaded(false);
+            setModelsLoadError(
+              "Face reader models could not load. Check your internet connection, then tap Retry.",
+            );
           }
-        };
-
-        intervalId = setInterval(() => {
-          void tick();
-        }, 500);
+        }
       } catch {
         if (!cancelled) {
           setCameraError(true);
@@ -328,6 +370,7 @@ export default function FaceScanner({ onResult }: FaceScannerProps) {
 
     return () => {
       cancelled = true;
+      startTickingRef.current = null;
       if (intervalId) clearInterval(intervalId);
       streamRef.current?.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
@@ -385,6 +428,25 @@ export default function FaceScanner({ onResult }: FaceScannerProps) {
     [addToast, finalizeResult],
   );
 
+  const [modelsRetryBusy, setModelsRetryBusy] = useState(false);
+
+  const handleRetryModels = useCallback(async () => {
+    resetFaceModelsLoaded();
+    setModelsLoadError(null);
+    setModelsRetryBusy(true);
+    try {
+      await loadModels();
+      setModelsLoaded(true);
+      startTickingRef.current?.();
+    } catch {
+      setModelsLoadError(
+        "Face reader models could not load. Check your internet connection, then tap Retry.",
+      );
+    } finally {
+      setModelsRetryBusy(false);
+    }
+  }, []);
+
   const dropZoneClick = () => fileInputRef.current?.click();
 
   const liveLabel = liveEmotion
@@ -430,8 +492,27 @@ export default function FaceScanner({ onResult }: FaceScannerProps) {
 
       {cameraError && (
         <p className="text-sm text-[var(--accent-alert)]" role="status">
-          Camera could not start. Use upload instead, or check browser permissions.
+          Camera could not start (permissions, no camera, or not HTTPS). Use{" "}
+          <strong className="text-[var(--text-primary)]">Upload</strong> above, or allow camera for this site.
         </p>
+      )}
+
+      {modelsLoadError && tab === "camera" && (
+        <div
+          className="rounded-xl border border-[var(--border)] bg-[var(--bg-base)] p-4 text-sm text-[var(--text-secondary)]"
+          role="status"
+        >
+          <p>{modelsLoadError}</p>
+          <Button
+            type="button"
+            variant="ghost"
+            className="mt-3"
+            loading={modelsRetryBusy}
+            onClick={() => void handleRetryModels()}
+          >
+            Retry loading models
+          </Button>
+        </div>
       )}
 
       {tab === "camera" && (

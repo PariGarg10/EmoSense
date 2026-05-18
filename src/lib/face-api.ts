@@ -1,61 +1,79 @@
-// MODEL FILES — download from:
-// github.com/justadudewhohacks/face-api.js/tree/master/weights
-// Place ALL these files in /public/models/:
-//   tiny_face_detector_model-weights_manifest.json
-//   tiny_face_detector_model-shard1
-//   face_expression_recognition_model-weights_manifest.json
-//   face_expression_recognition_model-shard1
-//   face_landmark_68_tiny_model-weights_manifest.json
-//   face_landmark_68_tiny_model-shard1
+// Loads face-api.js weights from /public/models when present, otherwise from CDN.
+// Local override: place weights in /public/models/ (see repo docs).
 
-import * as faceapi from 'face-api.js'
+import * as faceapi from "face-api.js";
 
-let modelsLoaded = false
+let modelsLoaded = false;
 
-async function loadModels(): Promise<void> {
-  if (modelsLoaded) return
+/** Pinned release so CDN URLs stay stable. */
+const CDN_WEIGHTS_BASE =
+  "https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@0.22.2/weights";
+
+const WEIGHT_URIS = ["/models", CDN_WEIGHTS_BASE] as const;
+
+async function loadModelsFromUri(baseUri: string): Promise<void> {
+  const base = baseUri.replace(/\/$/, "");
   await Promise.all([
-    faceapi.nets.tinyFaceDetector.loadFromUri('/models'),
-    faceapi.nets.faceExpressionNet.loadFromUri('/models'),
-    faceapi.nets.faceLandmark68TinyNet.loadFromUri('/models'),
-  ])
-  modelsLoaded = true
+    faceapi.nets.tinyFaceDetector.loadFromUri(base),
+    faceapi.nets.faceExpressionNet.loadFromUri(base),
+    faceapi.nets.faceLandmark68TinyNet.loadFromUri(base),
+  ]);
+}
+
+export async function loadModels(): Promise<void> {
+  if (modelsLoaded) return;
+  let lastError: unknown;
+  for (const uri of WEIGHT_URIS) {
+    try {
+      await loadModelsFromUri(uri);
+      modelsLoaded = true;
+      return;
+    } catch (e) {
+      lastError = e;
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error(String(lastError));
+}
+
+/** For “Retry” after a failed load (e.g. offline then back online). */
+export function resetFaceModelsLoaded(): void {
+  modelsLoaded = false;
 }
 
 async function detectFromVideo(videoEl: HTMLVideoElement) {
   return faceapi
     .detectSingleFace(videoEl, new faceapi.TinyFaceDetectorOptions())
     .withFaceLandmarks(true)
-    .withFaceExpressions()
+    .withFaceExpressions();
 }
 
 async function detectFromImage(imgEl: HTMLImageElement) {
   return faceapi
     .detectSingleFace(imgEl, new faceapi.TinyFaceDetectorOptions())
-    .withFaceExpressions()
+    .withFaceExpressions();
 }
 
 function getTopEmotion(expressions: faceapi.FaceExpressions): {
-  emotion: string
-  confidence: number
+  emotion: string;
+  confidence: number;
 } {
   const map: Record<string, string> = {
-    happy: 'joy',
-    sad: 'sadness',
-    angry: 'anger',
-    fearful: 'fear',
-    surprised: 'surprise',
-    disgusted: 'disgust',
-    neutral: 'calm',
-  }
-  const sorted = expressions.asSortedArray()
-  const top = sorted[0]
-  const key = top.expression
-  const value = top.probability
+    happy: "joy",
+    sad: "sadness",
+    angry: "anger",
+    fearful: "fear",
+    surprised: "surprise",
+    disgusted: "disgust",
+    neutral: "calm",
+  };
+  const sorted = expressions.asSortedArray();
+  const top = sorted[0];
+  const key = top.expression;
+  const value = top.probability;
   return {
     emotion: map[key] ?? key,
     confidence: Math.round(value * 100),
-  }
+  };
 }
 
-export { loadModels, detectFromVideo, detectFromImage, getTopEmotion }
+export { detectFromVideo, detectFromImage, getTopEmotion };

@@ -200,3 +200,47 @@ body {
   animation: none !important;
   transition: none !important;
 }
+
+@keyframes emosense-mesh-drift {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(40px, -24px) scale(1.05);
+  }
+}
+
+.emosense-mesh {
+  animation: emosense-mesh-drift 20s ease-in-out infinite;
+}
+
+.emosense-mesh-delay-1 {
+  animation-delay: -7s;
+}
+
+.emosense-mesh-delay-2 {
+  animation-delay: -14s;
+}
+
+@keyframes phone-float {
+  0%,
+  100% {
+    transform: translateY(-8px);
+  }
+  50% {
+    transform: translateY(8px);
+  }
+}
+
+.phone-float {
+  animation: phone-float 3s ease-in-out infinite;
+}
+
+.phone-float-delay-1 {
+  animation-delay: 0.5s;
+}
+
+.phone-float-delay-2 {
+  animation-delay: 1s;
+}
