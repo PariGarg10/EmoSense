@@ -1,7 +1,5 @@
 import type { FaceExpressions } from "@/lib/types";
-await faceapi.nets.tinyFaceDetector.loadFromUri('/models')
-await faceapi.nets.faceLandmark68Net.loadFromUri('/models')
-await faceapi.nets.faceExpressionNet.loadFromUri('/models')
+
 const WEIGHTS_ROOT =
   "https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights";
 
