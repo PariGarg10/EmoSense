@@ -3,6 +3,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type ChangeEvent,
@@ -161,9 +162,31 @@ export default function FaceScanner({ onResult }: FaceScannerProps) {
   const [showNoFaceHint, setShowNoFaceHint] = useState(false);
   const [uploadBusy, setUploadBusy] = useState(false);
 
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+
+  const attachStreamToVideo = useCallback(() => {
+    const video = videoRef.current;
+    const stream = streamRef.current;
+    if (!video || !stream) return false;
+    if (video.srcObject !== stream) {
+      video.srcObject = stream;
+    }
+    void video.play().catch(() => {});
+    return true;
+  }, []);
+
+  const bindVideoRef = useCallback(
+    (node: HTMLVideoElement | null) => {
+      videoRef.current = node;
+      if (node && streamRef.current) {
+        node.srcObject = streamRef.current;
+        void node.play().catch(() => {});
+      }
+    },
+    [],
+  );
   const fileInputRef = useRef<HTMLInputElement>(null);
   const lastExpressionsRef = useRef<FaceExpressions | null>(null);
   const noFaceSinceRef = useRef<number | null>(null);
@@ -334,29 +357,32 @@ export default function FaceScanner({ onResult }: FaceScannerProps) {
           return;
         }
         streamRef.current = stream;
-        const video = videoRef.current;
-        if (video) {
-          detachVideo = video;
-          video.srcObject = stream;
-          await video.play().catch(() => {});
+        detachVideo = videoRef.current;
+
+        if (!attachStreamToVideo()) {
+          await new Promise<void>((resolve) => {
+            requestAnimationFrame(() => resolve());
+          });
+          attachStreamToVideo();
         }
+
         setCameraBooting(false);
 
-        try {
-          await loadModels();
-          if (cancelled) return;
-          setModelsLoaded(true);
-          setModelsLoadError(null);
-          startTicking();
-        } catch {
-          if (!cancelled) {
+        void loadModels()
+          .then(() => {
+            if (cancelled) return;
+            setModelsLoaded(true);
+            setModelsLoadError(null);
+            startTicking();
+          })
+          .catch(() => {
+            if (cancelled) return;
             resetFaceModelsLoaded();
             setModelsLoaded(false);
             setModelsLoadError(
               "Face reader models could not load. Check your internet connection, then tap Retry.",
             );
-          }
-        }
+          });
       } catch {
         if (!cancelled) {
           setCameraError(true);
@@ -380,7 +406,12 @@ export default function FaceScanner({ onResult }: FaceScannerProps) {
       noFaceSinceRef.current = null;
       setShowNoFaceHint(false);
     };
-  }, [tab, drawBox]);
+  }, [tab, drawBox, attachStreamToVideo]);
+
+  useLayoutEffect(() => {
+    if (tab !== "camera" || cameraError) return;
+    attachStreamToVideo();
+  }, [tab, cameraBooting, cameraError, attachStreamToVideo]);
 
   const handleFileChange = useCallback(
     async (e: ChangeEvent<HTMLInputElement>) => {
@@ -532,8 +563,7 @@ export default function FaceScanner({ onResult }: FaceScannerProps) {
             </p>
           )}
 
-          {!cameraBooting && (
-            <div className="space-y-2">
+          <div className="space-y-2">
               {modelsLoaded && (
                 <span className="sr-only">Face reader models ready.</span>
               )}
@@ -562,8 +592,8 @@ export default function FaceScanner({ onResult }: FaceScannerProps) {
                   }}
                 >
                   <video
-                    ref={videoRef}
-                    className="block w-full object-cover"
+                    ref={bindVideoRef}
+                    className="block w-full bg-black object-cover"
                     style={{ aspectRatio: "4 / 3" }}
                     muted
                     playsInline
@@ -612,8 +642,7 @@ export default function FaceScanner({ onResult }: FaceScannerProps) {
                   )}
                 </div>
               </div>
-            </div>
-          )}
+          </div>
         </section>
       )}
 

@@ -1,11 +1,11 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { canAccessDashboard } from "@/src/lib/authGate";
 import clsx from "clsx";
 import Button from "@/components/ui/Button";
-import { ensureProfile } from "@/src/lib/authProfile";
+import { goToDashboard, markSignedIn } from "@/src/lib/authGate";
 import {
   clearBrowserAuth,
   DEMO_EMAIL,
@@ -14,10 +14,11 @@ import {
   registerLocalAccount,
   setDemoSession,
   setLocalSession,
+  setSupabaseSessionActive,
   tryDemoLogin,
   verifyLocalLogin,
+  type AuthKind,
 } from "@/src/lib/sessionAuth";
-import { createClient } from "@/src/lib/supabase";
 import { useEmoSenseStore } from "@/lib/store";
 
 type AuthMode = "signin" | "signup";
@@ -46,7 +47,6 @@ const passwordInputClass =
   "mt-2 min-h-[48px] w-full rounded-lg border border-neutral-300 bg-white px-4 text-base text-black placeholder:text-neutral-500";
 
 export default function LoginPage() {
-  const router = useRouter();
   const addToast = useEmoSenseStore((s) => s.addToast);
   const setUser = useEmoSenseStore((s) => s.setUser);
   const setUserRole = useEmoSenseStore((s) => s.setUserRole);
@@ -60,6 +60,12 @@ export default function LoginPage() {
   const [inlineError, setInlineError] = useState<string | null>(null);
   const [signupDone, setSignupDone] = useState(false);
 
+  useEffect(() => {
+    if (canAccessDashboard()) {
+      goToDashboard();
+    }
+  }, []);
+
   function switchMode(next: AuthMode) {
     setMode(next);
     setInlineError(null);
@@ -67,35 +73,27 @@ export default function LoginPage() {
     setPassword("");
   }
 
-  function goDashboardAfterBrowserAuth() {
-    addToast({ variant: "success", message: "Welcome to EmoSense!" });
-    router.replace("/dashboard");
+  function finishSignIn(
+    user: { id: string; email?: string; displayName?: string },
+    authKind: AuthKind,
+    role: "user" | "caregiver" | "therapist" = "user",
+  ) {
+    markSignedIn(authKind);
+    setUser({
+      id: user.id,
+      email: user.email,
+      displayName: user.displayName,
+    });
+    setUserRole(role);
+    setLoading(false);
+    goToDashboard();
   }
 
   function enterDemo() {
     setInlineError(null);
     clearBrowserAuth();
     setDemoSession();
-    const u = demoUser();
-    setUser({ id: u.id, email: u.email, displayName: u.displayName });
-    setUserRole("user");
-    goDashboardAfterBrowserAuth();
-  }
-
-  async function afterSupabaseSession(
-    supabase: NonNullable<ReturnType<typeof createClient>>,
-    authUser: import("@supabase/supabase-js").User,
-    name?: string,
-  ) {
-    clearBrowserAuth();
-    const profile = await ensureProfile(supabase, authUser, name);
-    setUser({
-      id: authUser.id,
-      email: authUser.email,
-      displayName: profile.displayName ?? undefined,
-    });
-    setUserRole(profile.role);
-    goDashboardAfterBrowserAuth();
+    finishSignIn(demoUser(), "demo");
   }
 
   async function handleSignIn(e: FormEvent) {
@@ -104,10 +102,7 @@ export default function LoginPage() {
 
     if (tryDemoLogin(email, password)) {
       setDemoSession();
-      const u = demoUser();
-      setUser({ id: u.id, email: u.email, displayName: u.displayName });
-      setUserRole("user");
-      goDashboardAfterBrowserAuth();
+      finishSignIn(demoUser(), "demo");
       return;
     }
 
@@ -119,33 +114,36 @@ export default function LoginPage() {
         email: localAcc.email,
         displayName: localAcc.displayName,
       });
-      setUser({
-        id: localAcc.id,
-        email: localAcc.email,
-        displayName: localAcc.displayName,
-      });
-      setUserRole("user");
-      goDashboardAfterBrowserAuth();
+      finishSignIn(
+        {
+          id: localAcc.id,
+          email: localAcc.email,
+          displayName: localAcc.displayName,
+        },
+        "local",
+      );
       return;
     }
 
+    setLoading(true);
+    const { createClient } = await import("@/src/lib/supabase");
     const supabase = createClient();
     if (!supabase) {
+      setLoading(false);
       setInlineError(
-        "Unknown email/password. Use the demo account, create a device-only account on Sign up, or add Supabase keys.",
+        "Unknown email/password. Use demo, Sign up (this device), or add Supabase keys on Vercel.",
       );
       addToast({ variant: "error", message: "Sign-in failed." });
       return;
     }
 
-    setLoading(true);
     const { data, error } = await supabase.auth.signInWithPassword({
       email: email.trim(),
       password,
     });
-    setLoading(false);
 
     if (error) {
+      setLoading(false);
       const friendly = formatAuthError(error.message);
       setInlineError(friendly);
       addToast({ variant: "error", message: friendly });
@@ -153,11 +151,24 @@ export default function LoginPage() {
     }
 
     if (!data.user) {
+      setLoading(false);
       setInlineError("Could not sign in. Please try again.");
       return;
     }
 
-    await afterSupabaseSession(supabase, data.user);
+    setSupabaseSessionActive();
+    const metaName =
+      typeof data.user.user_metadata?.display_name === "string"
+        ? data.user.user_metadata.display_name
+        : undefined;
+    finishSignIn(
+      {
+        id: data.user.id,
+        email: data.user.email,
+        displayName: metaName ?? data.user.email?.split("@")[0],
+      },
+      "supabase",
+    );
   }
 
   async function handleSignUp(e: FormEvent) {
@@ -185,25 +196,28 @@ export default function LoginPage() {
           email: acc.email,
           displayName: acc.displayName,
         });
-        setUser({
-          id: acc.id,
-          email: acc.email,
-          displayName: acc.displayName,
-        });
-        setUserRole("user");
-        goDashboardAfterBrowserAuth();
+        finishSignIn(
+          {
+            id: acc.id,
+            email: acc.email,
+            displayName: acc.displayName,
+          },
+          "local",
+        );
       }
       return;
     }
 
+    setLoading(true);
+    const { createClient } = await import("@/src/lib/supabase");
     const supabase = createClient();
     if (!supabase) {
+      setLoading(false);
       setInlineError("Cloud sign-up needs Supabase keys—or leave “Save on this device only” checked.");
       addToast({ variant: "error", message: "Sign-up is not configured." });
       return;
     }
 
-    setLoading(true);
     const { data, error } = await supabase.auth.signUp({
       email: email.trim(),
       password,
@@ -211,9 +225,9 @@ export default function LoginPage() {
         data: { display_name: displayName.trim() || undefined },
       },
     });
-    setLoading(false);
 
     if (error) {
+      setLoading(false);
       const friendly = formatAuthError(error.message);
       setInlineError(friendly);
       addToast({ variant: "error", message: friendly });
@@ -221,20 +235,25 @@ export default function LoginPage() {
     }
 
     if (data.session && data.user) {
-      await afterSupabaseSession(supabase, data.user, displayName.trim() || undefined);
+      setSupabaseSessionActive();
+      finishSignIn(
+        {
+          id: data.user.id,
+          email: data.user.email,
+          displayName: displayName.trim() || data.user.email?.split("@")[0],
+        },
+        "supabase",
+      );
       return;
     }
 
-    if (data.user) {
-      await ensureProfile(supabase, data.user, displayName);
-    }
-
+    setLoading(false);
     setSignupDone(true);
     setMode("signin");
     setPassword("");
     addToast({
       variant: "success",
-      message: "Check your email to confirm, or use “Save on this device only” for instant access.",
+      message: "Account created. Sign in with your email and password (or use device-only sign up).",
     });
   }
 

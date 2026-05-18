@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { goToDashboard, markSignedIn } from "@/src/lib/authGate";
 import { createClient } from "@/src/lib/supabase";
 
 export default function AuthCallbackPage() {
@@ -32,7 +33,8 @@ export default function AuthCallbackPage() {
           router.replace("/login");
           return;
         }
-        router.replace("/dashboard");
+        markSignedIn("supabase");
+        goToDashboard();
         return;
       }
 
@@ -54,7 +56,8 @@ export default function AuthCallbackPage() {
             router.replace("/login");
             return;
           }
-          router.replace("/dashboard");
+          markSignedIn("supabase");
+          goToDashboard();
           return;
         }
       }
@@ -63,7 +66,12 @@ export default function AuthCallbackPage() {
         data: { session },
       } = await supabase.auth.getSession();
       if (!active) return;
-      router.replace(session ? "/dashboard" : "/login");
+      if (session) {
+        markSignedIn("supabase");
+        goToDashboard();
+        return;
+      }
+      router.replace("/login");
     }
 
     finish();

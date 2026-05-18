@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import Button from "@/components/ui/Button";
 import EmotionResultsPanel from "@/components/emotion/EmotionResultsPanel";
 import { detectFromVideo, loadFaceApiModels } from "@/lib/face-api";
@@ -24,37 +24,19 @@ export default function CameraScanner() {
   const addActivity = useEmoSenseStore((s) => s.addActivity);
   const addToast = useEmoSenseStore((s) => s.addToast);
 
-  useEffect(() => {
-    let cancelled = false;
+  const videoCallbackRef = useCallback((node: HTMLVideoElement | null) => {
+    if (!node) return;
+    (videoRef as React.MutableRefObject<HTMLVideoElement>).current = node;
 
-    async function start() {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "user" },
-          audio: false,
-        });
-        if (cancelled) {
-          stream.getTracks().forEach((t) => t.stop());
-          return;
-        }
-        streamRef.current = stream;
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-        }
-      } catch {
-        setError(
-          "Camera could not start. You can switch to Upload photo or check browser permissions."
-        );
-      }
-    }
-
-    start();
-
-    return () => {
-      cancelled = true;
-      streamRef.current?.getTracks().forEach((t) => t.stop());
-      streamRef.current = null;
-    };
+    navigator.mediaDevices.getUserMedia({
+      video: { facingMode: "user" },
+      audio: false,
+    }).then((stream) => {
+      streamRef.current = stream;
+      node.srcObject = stream;
+    }).catch(() => {
+      setError("Camera could not start. Check browser permissions.");
+    });
   }, []);
 
   const drawBox = useCallback(
@@ -136,7 +118,7 @@ export default function CameraScanner() {
       <div className="relative overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] shadow-[var(--shadow-glow)]">
         <div className="relative aspect-video w-full bg-black">
           <video
-            ref={videoRef}
+            ref={videoCallbackRef}
             autoPlay
             muted
             playsInline

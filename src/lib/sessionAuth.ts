@@ -1,6 +1,5 @@
 /**
  * Browser-only auth for demos and local accounts (no confirmation email).
- * Not for production security — passwords stored in plain text for local accounts.
  */
 
 export const DEMO_EMAIL = "demo@emosense.local";
@@ -9,7 +8,11 @@ const DEMO_USER_ID = "00000000-0000-4000-8000-000000000001";
 
 const KEY_DEMO = "emosense-demo-session";
 const KEY_LOCAL = "emosense-local-session";
+const KEY_SUPABASE = "emosense-supabase-session";
+const KEY_KIND = "emosense-auth-kind";
 const KEY_ACCOUNTS = "emosense-local-accounts";
+
+export type AuthKind = "demo" | "local" | "supabase";
 
 export type LocalSession = {
   kind: "local";
@@ -18,13 +21,27 @@ export type LocalSession = {
   displayName?: string;
 };
 
+export function setAuthKind(kind: AuthKind): void {
+  if (typeof sessionStorage === "undefined") return;
+  sessionStorage.setItem(KEY_KIND, kind);
+  if (kind === "demo") sessionStorage.setItem(KEY_DEMO, "1");
+  if (kind === "supabase") sessionStorage.setItem(KEY_SUPABASE, "1");
+}
+
+export function getAuthKind(): AuthKind | null {
+  if (typeof sessionStorage === "undefined") return null;
+  const k = sessionStorage.getItem(KEY_KIND);
+  if (k === "demo" || k === "local" || k === "supabase") return k;
+  return null;
+}
+
 export function isDemoSession(): boolean {
   if (typeof sessionStorage === "undefined") return false;
   return sessionStorage.getItem(KEY_DEMO) === "1";
 }
 
 export function setDemoSession(): void {
-  sessionStorage.setItem(KEY_DEMO, "1");
+  setAuthKind("demo");
 }
 
 export function getLocalSession(): LocalSession | null {
@@ -41,13 +58,26 @@ export function getLocalSession(): LocalSession | null {
 }
 
 export function setLocalSession(session: LocalSession): void {
+  if (typeof sessionStorage === "undefined") return;
   sessionStorage.setItem(KEY_LOCAL, JSON.stringify(session));
+  sessionStorage.setItem(KEY_KIND, "local");
+}
+
+export function setSupabaseSessionActive(): void {
+  setAuthKind("supabase");
+}
+
+export function isSupabaseSessionActive(): boolean {
+  if (typeof sessionStorage === "undefined") return false;
+  return sessionStorage.getItem(KEY_SUPABASE) === "1";
 }
 
 export function clearBrowserAuth(): void {
   if (typeof sessionStorage === "undefined") return;
   sessionStorage.removeItem(KEY_DEMO);
   sessionStorage.removeItem(KEY_LOCAL);
+  sessionStorage.removeItem(KEY_SUPABASE);
+  sessionStorage.removeItem(KEY_KIND);
 }
 
 export function tryDemoLogin(email: string, password: string): boolean {

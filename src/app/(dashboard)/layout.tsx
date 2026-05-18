@@ -2,11 +2,25 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
+import type { User } from "@supabase/supabase-js";
 import DashboardShell from "@/src/components/layout/DashboardShell";
+import { canAccessDashboard } from "@/src/lib/authGate";
 import { ensureProfile } from "@/src/lib/authProfile";
+import {
+  demoUser,
+  getAuthKind,
+  getLocalSession,
+  isDemoSession,
+  isSupabaseSessionActive,
+} from "@/src/lib/sessionAuth";
 import { createClient } from "@/src/lib/supabase";
-import { demoUser, getLocalSession, isDemoSession } from "@/src/lib/sessionAuth";
 import { useEmoSenseStore } from "@/lib/store";
+
+function displayNameFromUser(user: User): string | undefined {
+  const meta = user.user_metadata?.display_name;
+  if (typeof meta === "string" && meta.trim()) return meta.trim();
+  return user.email?.split("@")[0];
+}
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
@@ -17,7 +31,9 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   useEffect(() => {
     let active = true;
 
-    function allowDemoOrLocal() {
+    function allowFromBrowserSession(): boolean {
+      if (!canAccessDashboard()) return false;
+
       if (isDemoSession()) {
         const u = demoUser();
         setUser({ id: u.id, email: u.email, displayName: u.displayName });
@@ -25,6 +41,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         setReady(true);
         return true;
       }
+
       const local = getLocalSession();
       if (local) {
         setUser({
@@ -36,10 +53,40 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         setReady(true);
         return true;
       }
+
+      const storeUser = useEmoSenseStore.getState().user;
+      if (storeUser?.id) {
+        setReady(true);
+        return true;
+      }
+
+      if (isSupabaseSessionActive() || getAuthKind() === "supabase") {
+        setReady(true);
+        return true;
+      }
+
       return false;
     }
 
-    if (allowDemoOrLocal()) {
+    if (allowFromBrowserSession()) {
+      const kind = getAuthKind();
+      if (kind === "supabase") {
+        const supabase = createClient();
+        if (supabase) {
+          void supabase.auth.getSession().then(({ data: { session } }) => {
+            if (!active || !session?.user) return;
+            void ensureProfile(supabase, session.user).then((profile) => {
+              if (!active) return;
+              setUser({
+                id: session.user.id,
+                email: session.user.email,
+                displayName: profile.displayName ?? displayNameFromUser(session.user),
+              });
+              setUserRole(profile.role);
+            });
+          });
+        }
+      }
       return () => {
         active = false;
       };
@@ -53,39 +100,30 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       };
     }
 
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
+    void supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (!active) return;
-      if (!session) {
-        router.replace("/login");
-        return;
-      }
-      const profile = await ensureProfile(supabase, session.user);
-      setUser({
-        id: session.user.id,
-        email: session.user.email,
-        displayName: profile.displayName ?? undefined,
-      });
-      setUserRole(profile.role);
-      setReady(true);
-    });
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
-      if (!active) return;
-      if (session) {
+      if (session?.user) {
+        setUser({
+          id: session.user.id,
+          email: session.user.email,
+          displayName: displayNameFromUser(session.user),
+        });
+        setUserRole("user");
         setReady(true);
+        try {
+          const profile = await ensureProfile(supabase, session.user);
+          if (!active) return;
+          setUserRole(profile.role);
+        } catch {
+          /* optional */
+        }
         return;
       }
-      if (isDemoSession() || getLocalSession()) return;
-      if (event === "SIGNED_OUT" || event === "INITIAL_SESSION") {
-        router.replace("/login");
-      }
+      router.replace("/login");
     });
 
     return () => {
       active = false;
-      subscription.unsubscribe();
     };
   }, [router, setUser, setUserRole]);
 
