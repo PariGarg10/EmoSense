@@ -37,10 +37,12 @@ const testimonials = [
 const featureAccents = ["#5B8DEF", "#7EC8A4", "#F4A96A"];
 
 const primaryCta =
-  "inline-flex min-h-[44px] items-center justify-center rounded-lg bg-[var(--accent-primary)] px-5 font-body text-base font-medium text-white transition-all duration-[var(--transition)] hover:brightness-110 hover:shadow-[var(--shadow-glow)]";
+  "inline-flex min-h-[48px] items-center justify-center rounded-full bg-[#EDF2FF] px-6 font-body text-base font-bold text-[#0D1117] shadow-[0_18px_60px_rgba(91,141,239,0.35)] transition-all duration-[var(--transition)] hover:-translate-y-0.5 hover:bg-white";
 
 const ghostCta =
-  "inline-flex min-h-[44px] items-center justify-center rounded-lg border border-[var(--accent-primary)] px-5 font-body text-base font-medium text-[var(--accent-primary)] transition-all duration-[var(--transition)] hover:bg-[var(--glow)]";
+  "inline-flex min-h-[48px] items-center justify-center rounded-full border border-white/25 bg-white/10 px-6 font-body text-base font-bold text-[#EDF2FF] backdrop-blur-xl transition-all duration-[var(--transition)] hover:-translate-y-0.5 hover:border-white/45 hover:bg-white/15";
+
+const heroVideoSrc = "/hero-bg.mp4";
 
 function PhoneMockup({
   bg,
@@ -108,12 +110,33 @@ export default function LandingPage() {
   const reduceMotion = useReducedMotion();
 
   return (
-    <main className="relative min-h-screen overflow-x-hidden bg-[var(--bg-base)] text-[var(--text-primary)] transition-colors duration-700">
-      <section className="relative flex min-h-screen flex-col">
-        <div className="pointer-events-none absolute inset-0 overflow-hidden">
+    <main className="isolate relative min-h-screen overflow-x-hidden bg-[#05070D] text-[var(--text-primary)] transition-colors duration-700">
+      <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
+        {!reduceMotion && (
+          <video
+            className="h-full w-full scale-105 object-cover opacity-80 saturate-[1.2]"
+            autoPlay
+            muted
+            loop
+            playsInline
+            preload="metadata"
+            aria-hidden
+          >
+            <source src={heroVideoSrc} type="video/mp4" />
+          </video>
+        )}
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_18%,rgba(91,141,239,0.22),transparent_34%),radial-gradient(circle_at_86%_72%,rgba(244,169,106,0.18),transparent_28%),linear-gradient(180deg,rgba(5,7,13,0.42),#05070D_88%)]" />
+        <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(5,7,13,0.72),rgba(5,7,13,0.24)_46%,rgba(5,7,13,0.76))]" />
+      </div>
+
+      <section className="relative z-10 flex min-h-screen flex-col overflow-hidden">
+
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-black/50 to-transparent" />
+
+        <div className="pointer-events-none absolute inset-0 overflow-hidden mix-blend-screen">
           <div
             className={clsx(
-              "absolute -left-[10%] top-[-15%] h-[min(520px,80vw)] w-[min(520px,80vw)] rounded-full opacity-90",
+              "absolute -left-[10%] top-[-15%] h-[min(520px,80vw)] w-[min(520px,80vw)] rounded-full opacity-70",
               !reduceMotion && "emosense-mesh",
             )}
             style={{
@@ -123,7 +146,7 @@ export default function LandingPage() {
           />
           <div
             className={clsx(
-              "absolute bottom-[-20%] right-[-15%] h-[min(560px,85vw)] w-[min(560px,85vw)] rounded-full opacity-90",
+              "absolute bottom-[-20%] right-[-15%] h-[min(560px,85vw)] w-[min(560px,85vw)] rounded-full opacity-70",
               !reduceMotion && "emosense-mesh emosense-mesh-delay-1",
             )}
             style={{
@@ -133,63 +156,145 @@ export default function LandingPage() {
           />
         </div>
 
-        <div className="relative z-10 mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 pb-16 pt-12 sm:px-6 lg:px-8">
-          <header className="flex items-center justify-between gap-4">
-            <p className="font-display text-xl font-bold text-[var(--accent-primary)]">EmoSense</p>
+        <div className="relative z-10 mx-auto flex w-full max-w-7xl flex-1 flex-col px-4 pb-16 pt-6 sm:px-6 lg:px-8">
+          <header className="flex items-center justify-between gap-4 rounded-full border border-white/10 bg-white/[0.06] px-4 py-3 shadow-2xl backdrop-blur-2xl">
+            <p className="font-display text-xl font-bold text-[#EDF2FF] drop-shadow">
+              EmoSense
+            </p>
+            <nav className="hidden items-center gap-6 text-sm font-medium text-[#C5D0E0] md:flex">
+              <a href="#features" className="hover:text-white">
+                Features
+              </a>
+              <a href="#emotions" className="hover:text-white">
+                Emotions
+              </a>
+              <a href="#stories" className="hover:text-white">
+                Stories
+              </a>
+            </nav>
             <Link
               href="/login"
-              className="inline-flex min-h-[44px] items-center rounded-lg border border-[var(--border)] px-4 text-sm font-medium text-[var(--text-secondary)] hover:border-[var(--accent-primary)] hover:text-[var(--text-primary)]"
+              className="inline-flex min-h-[44px] items-center rounded-full border border-white/20 bg-white/10 px-5 text-sm font-bold text-[#EDF2FF] backdrop-blur hover:border-white/40 hover:bg-white/15"
             >
               Sign in
             </Link>
           </header>
 
-          <div className="mt-12 flex flex-1 flex-col items-center justify-center text-center lg:mt-8">
-            <h1
-              className="max-w-3xl font-display text-[52px] font-bold leading-tight text-[#EDF2FF] max-sm:text-[36px]"
-            >
-              Understand every emotion.
-            </h1>
-            <p className="mt-5 max-w-xl font-body text-[20px] text-[#8A9BB5]">
-              Simple. Safe. At your own pace.
-            </p>
-            <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
-              <Link href="/login" className={primaryCta}>
-                Get started free
-              </Link>
-              <a href="#features" className={ghostCta}>
-                See how it works
-              </a>
+          <div className="grid flex-1 items-center gap-12 py-16 lg:grid-cols-[1.02fr_0.98fr] lg:py-10">
+            <div className="max-w-3xl">
+              <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.08] px-4 py-2 text-xs font-bold uppercase tracking-[0.22em] text-[#C5D0E0] backdrop-blur-2xl">
+                <span className="h-2 w-2 rounded-full bg-[var(--accent-soft)] shadow-[0_0_20px_var(--accent-soft)]" />
+                Autism-friendly emotion support
+              </div>
+
+              <h1 className="mt-8 max-w-4xl font-display text-[clamp(3rem,7vw,6.8rem)] font-extrabold leading-[0.92] tracking-[-0.06em] text-[#EDF2FF] drop-shadow-[0_24px_80px_rgba(0,0,0,0.65)]">
+                Understand every emotion.
+              </h1>
+
+              <p className="mt-7 max-w-2xl font-body text-[clamp(1.1rem,2vw,1.45rem)] leading-relaxed text-[#C5D0E0] drop-shadow">
+                A calm space to read faces, track moods, and learn emotional
+                language without pressure.
+              </p>
+
+              <div className="mt-10 flex flex-wrap items-center gap-4">
+                <Link href="/login" className={primaryCta}>
+                  Get started free
+                </Link>
+                <a href="#features" className={ghostCta}>
+                  Watch how it feels
+                </a>
+              </div>
+
+              <dl className="mt-12 grid max-w-xl grid-cols-3 gap-3">
+                {[
+                  ["16", "emotions"],
+                  ["3", "care views"],
+                  ["0", "pressure"],
+                ].map(([value, label]) => (
+                  <div
+                    key={label}
+                    className="rounded-2xl border border-white/10 bg-white/[0.07] p-4 backdrop-blur-xl"
+                  >
+                    <dt className="font-display text-3xl font-bold text-white">
+                      {value}
+                    </dt>
+                    <dd className="mt-1 text-xs uppercase tracking-[0.18em] text-[#8A9BB5]">
+                      {label}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
             </div>
 
-            <div className="mt-16 flex items-end justify-center gap-4 sm:gap-8">
-              <PhoneMockup
-                bg="#FFE566"
-                label="Happy"
-                mood="happy"
-                delayClass={reduceMotion ? undefined : "phone-float-delay-1"}
-                className="scale-95 opacity-90"
-              />
-              <PhoneMockup
-                bg="#5B8DEF"
-                label="Sad"
-                mood="sad"
-                className="z-10 -mt-6 scale-110"
-              />
-              <PhoneMockup
-                bg="#E07B7B"
-                label="Angry"
-                mood="angry"
-                delayClass={reduceMotion ? undefined : "phone-float-delay-2"}
-                className="scale-95 opacity-90"
-              />
+            <div className="relative mx-auto w-full max-w-[560px]">
+              <div className="absolute -inset-10 rounded-full bg-[radial-gradient(circle,rgba(91,141,239,0.35),transparent_66%)] blur-2xl" />
+              <div className="relative overflow-hidden rounded-[36px] border border-white/15 bg-white/[0.08] p-5 shadow-[0_30px_120px_rgba(0,0,0,0.55)] backdrop-blur-2xl">
+                <div className="rounded-[28px] border border-white/10 bg-[#0D1117]/70 p-5">
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.22em] text-[#8A9BB5]">
+                        Live emotion preview
+                      </p>
+                      <p className="mt-2 font-display text-3xl font-bold text-white">
+                        Calm, then clear
+                      </p>
+                    </div>
+                    <div className="rounded-full border border-[var(--accent-primary)]/40 bg-[var(--accent-primary)]/15 px-3 py-1 text-xs font-bold text-[#EDF2FF]">
+                      gentle AI
+                    </div>
+                  </div>
+
+                  <div className="mt-8 flex items-end justify-center gap-3 sm:gap-6">
+                    <PhoneMockup
+                      bg="#FFE566"
+                      label="Happy"
+                      mood="happy"
+                      delayClass={reduceMotion ? undefined : "phone-float-delay-1"}
+                      className="scale-90 opacity-90"
+                    />
+                    <PhoneMockup
+                      bg="#5B8DEF"
+                      label="Sad"
+                      mood="sad"
+                      className="z-10 -mt-8 scale-110"
+                    />
+                    <PhoneMockup
+                      bg="#E07B7B"
+                      label="Angry"
+                      mood="angry"
+                      delayClass={reduceMotion ? undefined : "phone-float-delay-2"}
+                      className="scale-90 opacity-90"
+                    />
+                  </div>
+
+                  <div className="mt-8 grid grid-cols-3 gap-3">
+                    {["Read", "Track", "Learn"].map((item) => (
+                      <div
+                        key={item}
+                        className="rounded-2xl border border-white/10 bg-white/[0.06] px-3 py-4 text-center"
+                      >
+                        <p className="font-display text-lg font-bold text-white">
+                          {item}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </section>
 
-      <section id="features" className="relative z-10 mx-auto max-w-6xl px-4 py-24 sm:px-6 lg:px-8">
-        <h2 className="font-display text-3xl font-bold text-[var(--text-primary)]">Built for clarity</h2>
+      <section id="features" className="relative z-10 mx-auto max-w-7xl px-4 py-24 sm:px-6 lg:px-8">
+        <div className="max-w-2xl">
+          <p className="text-xs font-bold uppercase tracking-[0.24em] text-[var(--accent-primary)]">
+            Designed around comfort
+          </p>
+          <h2 className="mt-4 font-display text-4xl font-extrabold tracking-[-0.04em] text-[#EDF2FF] md:text-5xl">
+            Tools that feel quiet, not clinical.
+          </h2>
+        </div>
         <div className="mt-10 grid gap-6 md:grid-cols-3">
           {[
             { title: "Read a face", body: "Camera or upload with on-device models and plain-language explanations." },
@@ -198,10 +303,10 @@ export default function LandingPage() {
           ].map((card, idx) => (
             <article
               key={card.title}
-              className="rounded-2xl border p-8 transition-all duration-300"
+              className="group rounded-[28px] border p-8 backdrop-blur-2xl transition-all duration-300 hover:-translate-y-1"
               style={{
-                background: "#161C26",
-                borderColor: "rgba(91, 141, 239, 0.15)",
+                background: "rgba(22, 28, 38, 0.62)",
+                borderColor: "rgba(255, 255, 255, 0.1)",
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.borderColor = featureAccents[idx];
@@ -212,16 +317,30 @@ export default function LandingPage() {
                 e.currentTarget.style.boxShadow = "none";
               }}
             >
-              <h3 className="font-display text-[22px] font-bold text-[var(--text-primary)]">{card.title}</h3>
+              <div
+                className="mb-8 h-14 w-14 rounded-2xl"
+                style={{
+                  background: `linear-gradient(145deg, ${featureAccents[idx]}, rgba(255,255,255,0.15))`,
+                  boxShadow: `0 0 40px ${featureAccents[idx]}40`,
+                }}
+              />
+              <h3 className="font-display text-[24px] font-bold text-[#EDF2FF]">{card.title}</h3>
               <p className="mt-3 text-base leading-relaxed text-[var(--text-secondary)]">{card.body}</p>
             </article>
           ))}
         </div>
       </section>
 
-      <section className="relative z-10 mx-auto max-w-6xl px-4 py-16 sm:px-6 lg:px-8">
+      <section id="emotions" className="relative z-10 mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
         <div className="flex flex-wrap items-end justify-between gap-4">
-          <h2 className="font-display text-3xl font-bold text-[var(--text-primary)]">Feel the colours</h2>
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.24em] text-[var(--accent-warm)]">
+              Interactive palette
+            </p>
+            <h2 className="mt-4 font-display text-4xl font-extrabold tracking-[-0.04em] text-[#EDF2FF] md:text-5xl">
+              Let the whole page shift with a feeling.
+            </h2>
+          </div>
           <Link
             href="/emotion-dictionary"
             className="min-h-[44px] text-sm font-medium text-[var(--accent-primary)] underline-offset-4 hover:underline"
@@ -229,7 +348,7 @@ export default function LandingPage() {
             See all emotions →
           </Link>
         </div>
-        <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
+        <div className="mt-10 grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
           {emotions.map((emo) => {
             const theme = EMOTION_THEMES[emo.themeKey] ?? EMOTION_THEMES.neutral;
             return (
@@ -237,7 +356,7 @@ export default function LandingPage() {
                 key={emo.id}
                 type="button"
                 onClick={() => applyEmotionTheme(emo.themeKey)}
-                className="group relative flex aspect-square items-center justify-center overflow-hidden rounded-2xl border border-white/10 transition-transform duration-300 hover:scale-[1.02] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent-primary)]"
+                className="group relative flex aspect-square items-center justify-center overflow-hidden rounded-[28px] border border-white/10 shadow-[0_18px_70px_rgba(0,0,0,0.28)] transition-transform duration-300 hover:scale-[1.02] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent-primary)]"
                 style={{
                   background: `linear-gradient(145deg, ${theme.accentColor} 0%, ${theme.faceColor} 55%, ${theme.bgColor} 100%)`,
                 }}
@@ -252,13 +371,13 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <section className="relative z-10 mx-auto max-w-6xl px-4 py-16 sm:px-6 lg:px-8">
-        <h2 className="font-display text-3xl font-bold text-[var(--text-primary)]">Voices from caregivers</h2>
+      <section id="stories" className="relative z-10 mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
+        <h2 className="font-display text-4xl font-extrabold tracking-[-0.04em] text-[#EDF2FF] md:text-5xl">Voices from caregivers</h2>
         <div className="mt-6 flex gap-4 overflow-x-auto pb-2 snap-x snap-mandatory [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {testimonials.map((t) => (
             <figure
               key={t.role}
-              className="min-w-[260px] max-w-sm shrink-0 snap-start rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] p-6"
+              className="min-w-[280px] max-w-sm shrink-0 snap-start rounded-[28px] border border-white/10 bg-white/[0.07] p-6 backdrop-blur-2xl"
             >
               <blockquote className="text-sm leading-relaxed text-[var(--text-secondary)]">
                 &ldquo;{t.quote}&rdquo;
@@ -269,7 +388,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <footer className="relative z-10 border-t border-[var(--border)] py-10 text-center text-sm text-[var(--text-muted)]">
+      <footer className="relative z-10 border-t border-white/10 bg-black/20 py-10 text-center text-sm text-[var(--text-muted)] backdrop-blur-xl">
         EmoSense — Built with care for autistic individuals
       </footer>
     </main>
