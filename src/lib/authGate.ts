@@ -34,7 +34,7 @@ export function canAccessDashboard(): boolean {
 
 export function goToDashboard(): void {
   if (typeof window !== "undefined") {
-    window.location.assign("/dashboard");
+    window.location.href = "/dashboard";
     return;
   }
 }

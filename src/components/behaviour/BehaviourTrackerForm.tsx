@@ -72,8 +72,8 @@ function EnergyBattery({ level }: { level: number }) {
 export default function BehaviourTrackerForm() {
   const user = useEmoSenseStore((s) => s.user);
   const addToast = useEmoSenseStore((s) => s.addToast);
-  const incrementStreak = useEmoSenseStore((s) => s.incrementStreak);
   const addActivity = useEmoSenseStore((s) => s.addActivity);
+  const recordDailyEmotion = useEmoSenseStore((s) => s.recordDailyEmotion);
 
   const [timeOfDay, setTimeOfDay] =
     useState<(typeof timeOptions)[number]>("Morning");
@@ -129,7 +129,7 @@ export default function BehaviourTrackerForm() {
         .filter(Boolean)
         .join(" · "),
     });
-    incrementStreak();
+    recordDailyEmotion(selectedEmotion, "tracker");
     addToast({ variant: "success", message: "Behaviour log saved." });
     setNote("");
     setSaving(false);

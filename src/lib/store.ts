@@ -52,6 +52,9 @@ type EmoSenseStore = {
 
   behaviourStreak: number;
   incrementStreak: () => void;
+  lastStreakDate: string | null;
+  dailyEmotions: { date: string; emotion: string; source: "manual" | "scan" | "tracker" }[];
+  recordDailyEmotion: (emotion: string, source: "manual" | "scan" | "tracker") => void;
 
   weekEmotionSeries: { day: string; count: number }[];
   lastScan: { emotion: string; confidence: number } | null;
@@ -128,9 +131,32 @@ export const useEmoSenseStore = create<EmoSenseStore>()(
       weeklyReportEmail: false,
       setWeeklyReportEmail: (v) => set({ weeklyReportEmail: v }),
 
-      behaviourStreak: 4,
-      incrementStreak: () =>
-        set({ behaviourStreak: get().behaviourStreak + 1 }),
+      behaviourStreak: 0,
+      lastStreakDate: null,
+      dailyEmotions: [],
+      incrementStreak: () => {
+        const today = new Date().toISOString().slice(0, 10);
+        const last = get().lastStreakDate;
+        if (last === today) return;
+
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        const yesterdayKey = yesterday.toISOString().slice(0, 10);
+
+        set({
+          behaviourStreak: last === yesterdayKey ? get().behaviourStreak + 1 : 1,
+          lastStreakDate: today,
+        });
+      },
+      recordDailyEmotion: (emotion, source) => {
+        const today = new Date().toISOString().slice(0, 10);
+        const next = [
+          { date: today, emotion, source },
+          ...get().dailyEmotions.filter((entry) => entry.date !== today),
+        ].slice(0, 60);
+        set({ dailyEmotions: next });
+        get().incrementStreak();
+      },
 
       weekEmotionSeries: [
         { day: "Mon", count: 3 },
@@ -190,6 +216,8 @@ export const useEmoSenseStore = create<EmoSenseStore>()(
         dailyReminderTime: s.dailyReminderTime,
         weeklyReportEmail: s.weeklyReportEmail,
         behaviourStreak: s.behaviourStreak,
+        lastStreakDate: s.lastStreakDate,
+        dailyEmotions: s.dailyEmotions,
         lastScan: s.lastScan,
         recentActivity: s.recentActivity,
         weekEmotionSeries: s.weekEmotionSeries,

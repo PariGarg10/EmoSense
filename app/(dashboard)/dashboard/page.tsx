@@ -75,6 +75,8 @@ export default function DashboardPage() {
   const behaviourStreak = useEmoSenseStore((s) => s.behaviourStreak);
   const setLastScan = useEmoSenseStore((s) => s.setLastScan);
   const recentActivity = useEmoSenseStore((s) => s.recentActivity);
+  const dailyEmotions = useEmoSenseStore((s) => s.dailyEmotions);
+  const recordDailyEmotion = useEmoSenseStore((s) => s.recordDailyEmotion);
 
   const [selected, setSelected] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -139,6 +141,7 @@ export default function DashboardPage() {
       variant: "success",
       message: "Your check-in was saved. Thank you for noticing how you feel.",
     });
+    recordDailyEmotion(selected, "manual");
     setSaved(true);
     setSaving(false);
     applyEmotionTheme(selected);
@@ -147,6 +150,7 @@ export default function DashboardPage() {
   const handleScanResult = async (emotion: string, confidence: number) => {
     const label = getTheme(emotion).label;
     setLastScan({ emotion: label, confidence });
+    recordDailyEmotion(emotion, "scan");
     setScannerOpen(false);
     setScanMood({ emotion: label, timestamp: new Date() });
     if (user?.id) {
@@ -172,6 +176,8 @@ export default function DashboardPage() {
           source: "manual" as const,
           note: a.note ?? null,
         }));
+
+  const todayEmotion = dailyEmotions[0];
 
   const rowEnter = (index: number) =>
     reduceMotion
@@ -239,7 +245,7 @@ export default function DashboardPage() {
           </p>
           <div className="mt-4 flex items-center gap-4">
             <EmotionFace
-              emotion={todayLog?.emotion ?? selected ?? "neutral"}
+              emotion={todayLog?.emotion ?? todayEmotion?.emotion ?? selected ?? "neutral"}
               size="sm"
               animated={false}
             />
@@ -247,6 +253,8 @@ export default function DashboardPage() {
               <p className="font-display text-lg font-bold">
                 {todayLog
                   ? getTheme(todayLog.emotion).label
+                  : todayEmotion
+                    ? getTheme(todayEmotion.emotion).label
                   : selected
                     ? getTheme(selected).label
                     : "Not logged yet"}
@@ -254,6 +262,11 @@ export default function DashboardPage() {
               {todayLog && (
                 <p className="font-body text-sm text-[var(--text-secondary)]">
                   logged at {formatLogTime(todayLog.logged_at)}
+                </p>
+              )}
+              {!todayLog && todayEmotion && (
+                <p className="font-body text-sm text-[var(--text-secondary)]">
+                  saved today from {todayEmotion.source}
                 </p>
               )}
             </div>
@@ -267,7 +280,7 @@ export default function DashboardPage() {
           <div className="mt-4 flex items-center gap-3">
             <FlameIcon />
             <p className="font-display text-5xl font-bold leading-none">
-              {streak}
+              {Math.max(streak, behaviourStreak)}
             </p>
           </div>
           <p className="mt-2 font-body text-sm text-[var(--text-secondary)]">

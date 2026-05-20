@@ -2,10 +2,9 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
-import { canAccessDashboard } from "@/src/lib/authGate";
 import clsx from "clsx";
 import Button from "@/components/ui/Button";
-import { goToDashboard, markSignedIn } from "@/src/lib/authGate";
+import { canAccessDashboard, goToDashboard, markSignedIn } from "@/src/lib/authGate";
 import {
   clearBrowserAuth,
   DEMO_EMAIL,
@@ -86,6 +85,7 @@ export default function LoginPage() {
     });
     setUserRole(role);
     setLoading(false);
+    addToast({ variant: "success", message: "Opening your dashboard..." });
     goToDashboard();
   }
 
@@ -157,6 +157,7 @@ export default function LoginPage() {
     }
 
     setSupabaseSessionActive();
+    markSignedIn("supabase");
     const metaName =
       typeof data.user.user_metadata?.display_name === "string"
         ? data.user.user_metadata.display_name

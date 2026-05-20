@@ -31,11 +31,13 @@ export default function EmotionScanPage() {
   const user = useEmoSenseStore((s) => s.user);
   const addToast = useEmoSenseStore((s) => s.addToast);
   const setCurrentEmotion = useEmoSenseStore((s) => s.setCurrentEmotion);
+  const recordDailyEmotion = useEmoSenseStore((s) => s.recordDailyEmotion);
   const [detected, setDetected] = useState(false);
 
   const handleResult = async (emotion: string, confidence: number) => {
     setDetected(true);
     setCurrentEmotion(emotion);
+    recordDailyEmotion(emotion, "scan");
 
     if (user?.id) {
       await insertEmotionLog({

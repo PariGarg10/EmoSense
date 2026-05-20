@@ -36,6 +36,24 @@ const testimonials = [
 
 const featureAccents = ["#5B8DEF", "#7EC8A4", "#F4A96A"];
 
+const featureCards = [
+  {
+    title: "Read a face",
+    body: "Camera or upload with on-device models and plain-language explanations.",
+    href: "/emotion-scan",
+  },
+  {
+    title: "Track moods",
+    body: "Log energy, time of day, and activities to spot gentle patterns over time.",
+    href: "/behaviour-tracker",
+  },
+  {
+    title: "Emotion library",
+    body: "Sixteen illustrated emotions with body maps and calming strategies.",
+    href: "/emotion-dictionary",
+  },
+];
+
 const primaryCta =
   "inline-flex min-h-[48px] items-center justify-center rounded-full bg-[#EDF2FF] px-6 font-body text-base font-bold text-[#0D1117] shadow-[0_18px_60px_rgba(91,141,239,0.35)] transition-all duration-[var(--transition)] hover:-translate-y-0.5 hover:bg-white";
 
@@ -125,8 +143,8 @@ export default function LandingPage() {
             <source src={heroVideoSrc} type="video/mp4" />
           </video>
         )}
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_18%,rgba(91,141,239,0.22),transparent_34%),radial-gradient(circle_at_86%_72%,rgba(244,169,106,0.18),transparent_28%),linear-gradient(180deg,rgba(5,7,13,0.42),#05070D_88%)]" />
-        <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(5,7,13,0.72),rgba(5,7,13,0.24)_46%,rgba(5,7,13,0.76))]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_18%,rgba(91,141,239,0.24),transparent_34%),radial-gradient(circle_at_86%_72%,rgba(244,169,106,0.18),transparent_28%),linear-gradient(180deg,rgba(5,7,13,0.76),#05070D_86%)]" />
+        <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(5,7,13,0.88),rgba(5,7,13,0.54)_46%,rgba(5,7,13,0.9))]" />
       </div>
 
       <section className="relative z-10 flex min-h-screen flex-col overflow-hidden">
@@ -181,7 +199,7 @@ export default function LandingPage() {
           </header>
 
           <div className="grid flex-1 items-center gap-12 py-16 lg:grid-cols-[1.02fr_0.98fr] lg:py-10">
-            <div className="max-w-3xl">
+            <div className="max-w-3xl rounded-[36px] border border-white/10 bg-black/35 p-6 shadow-[0_30px_120px_rgba(0,0,0,0.5)] backdrop-blur-md md:p-8">
               <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.08] px-4 py-2 text-xs font-bold uppercase tracking-[0.22em] text-[#C5D0E0] backdrop-blur-2xl">
                 <span className="h-2 w-2 rounded-full bg-[var(--accent-soft)] shadow-[0_0_20px_var(--accent-soft)]" />
                 Autism-friendly emotion support
@@ -211,8 +229,9 @@ export default function LandingPage() {
                   ["3", "care views"],
                   ["0", "pressure"],
                 ].map(([value, label]) => (
-                  <div
+                    <Link
                     key={label}
+                      href={label === "emotions" ? "/emotion-dictionary" : label === "care views" ? "/reports" : "/login"}
                     className="rounded-2xl border border-white/10 bg-white/[0.07] p-4 backdrop-blur-xl"
                   >
                     <dt className="font-display text-3xl font-bold text-white">
@@ -221,7 +240,7 @@ export default function LandingPage() {
                     <dd className="mt-1 text-xs uppercase tracking-[0.18em] text-[#8A9BB5]">
                       {label}
                     </dd>
-                  </div>
+                  </Link>
                 ))}
               </dl>
             </div>
@@ -268,15 +287,20 @@ export default function LandingPage() {
                   </div>
 
                   <div className="mt-8 grid grid-cols-3 gap-3">
-                    {["Read", "Track", "Learn"].map((item) => (
-                      <div
+                    {[
+                      ["Read", "/emotion-scan"],
+                      ["Track", "/behaviour-tracker"],
+                      ["Learn", "/emotion-dictionary"],
+                    ].map(([item, href]) => (
+                      <Link
                         key={item}
+                        href={href}
                         className="rounded-2xl border border-white/10 bg-white/[0.06] px-3 py-4 text-center"
                       >
                         <p className="font-display text-lg font-bold text-white">
                           {item}
                         </p>
-                      </div>
+                      </Link>
                     ))}
                   </div>
                 </div>
@@ -296,13 +320,10 @@ export default function LandingPage() {
           </h2>
         </div>
         <div className="mt-10 grid gap-6 md:grid-cols-3">
-          {[
-            { title: "Read a face", body: "Camera or upload with on-device models and plain-language explanations." },
-            { title: "Track moods", body: "Log energy, time of day, and activities to spot gentle patterns over time." },
-            { title: "Emotion library", body: "Sixteen illustrated emotions with body maps and calming strategies." },
-          ].map((card, idx) => (
-            <article
+          {featureCards.map((card, idx) => (
+            <Link
               key={card.title}
+              href={card.href}
               className="group rounded-[28px] border p-8 backdrop-blur-2xl transition-all duration-300 hover:-translate-y-1"
               style={{
                 background: "rgba(22, 28, 38, 0.62)",
@@ -325,8 +346,11 @@ export default function LandingPage() {
                 }}
               />
               <h3 className="font-display text-[24px] font-bold text-[#EDF2FF]">{card.title}</h3>
-              <p className="mt-3 text-base leading-relaxed text-[var(--text-secondary)]">{card.body}</p>
-            </article>
+              <p className="mt-3 text-base leading-relaxed text-[#C5D0E0]">{card.body}</p>
+              <span className="mt-6 inline-flex text-sm font-bold text-[var(--accent-primary)]">
+                Open {card.title} →
+              </span>
+            </Link>
           ))}
         </div>
       </section>
@@ -362,7 +386,8 @@ export default function LandingPage() {
                 }}
                 aria-label={`Preview ${emo.name} theme`}
               >
-                <span className="relative z-10 px-2 text-center font-display text-sm font-bold text-white drop-shadow-md sm:text-base">
+                <span className="absolute inset-0 bg-black/20 transition-colors group-hover:bg-black/10" />
+                <span className="relative z-10 px-2 text-center font-display text-sm font-bold text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.8)] sm:text-base">
                   {emo.name}
                 </span>
               </button>
@@ -375,15 +400,16 @@ export default function LandingPage() {
         <h2 className="font-display text-4xl font-extrabold tracking-[-0.04em] text-[#EDF2FF] md:text-5xl">Voices from caregivers</h2>
         <div className="mt-6 flex gap-4 overflow-x-auto pb-2 snap-x snap-mandatory [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {testimonials.map((t) => (
-            <figure
+            <Link
               key={t.role}
+              href="/login"
               className="min-w-[280px] max-w-sm shrink-0 snap-start rounded-[28px] border border-white/10 bg-white/[0.07] p-6 backdrop-blur-2xl"
             >
               <blockquote className="text-sm leading-relaxed text-[var(--text-secondary)]">
                 &ldquo;{t.quote}&rdquo;
               </blockquote>
               <figcaption className="mt-4 text-xs text-[var(--text-muted)]">{t.role}</figcaption>
-            </figure>
+            </Link>
           ))}
         </div>
       </section>

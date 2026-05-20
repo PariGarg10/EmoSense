@@ -56,7 +56,7 @@ export default function EmotionLogForm() {
 
   const addActivity = useEmoSenseStore((s) => s.addActivity);
   const addToast = useEmoSenseStore((s) => s.addToast);
-  const incrementStreak = useEmoSenseStore((s) => s.incrementStreak);
+  const recordDailyEmotion = useEmoSenseStore((s) => s.recordDailyEmotion);
 
   function toggleActivity(activity: string) {
     setSelectedActivities((prev) =>
@@ -73,7 +73,7 @@ export default function EmotionLogForm() {
       emotion: selectedEmotion,
       note: [timeOfDay, ...selectedActivities, `Energy ${energy}/5`, note].filter(Boolean).join(" · "),
     });
-    incrementStreak();
+    recordDailyEmotion(selectedEmotion, "manual");
     addToast({ variant: "success", message: "Entry saved to your local activity list." });
     setNote("");
   }
