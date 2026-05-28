@@ -6,6 +6,8 @@ import {
   BarChart,
   CartesianGrid,
   Legend,
+  Line,
+  LineChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -27,6 +29,13 @@ const sampleBars = [
   { date: "May 3", Joy: 0, Calm: 1, Sadness: 2, Anger: 1, Fear: 0, Surprise: 0 },
   { date: "May 4", Joy: 3, Calm: 2, Sadness: 0, Anger: 0, Fear: 1, Surprise: 1 },
   { date: "May 5", Joy: 1, Calm: 4, Sadness: 1, Anger: 0, Fear: 0, Surprise: 0 },
+];
+
+const sampleTrend = [
+  { date: "Week 1", positive: 62, difficult: 24, scanConfidence: 71 },
+  { date: "Week 2", positive: 58, difficult: 31, scanConfidence: 68 },
+  { date: "Week 3", positive: 66, difficult: 20, scanConfidence: 74 },
+  { date: "Week 4", positive: 72, difficult: 18, scanConfidence: 77 },
 ];
 
 const sampleRows: LogEntry[] = [
@@ -57,6 +66,37 @@ const sampleRows: LogEntry[] = [
 ];
 
 type SortKey = "logged_at" | "emotion" | "energy_level";
+
+const evaluationMetrics = [
+  "Scan agreement rate: how often the user or caregiver agrees with the detected emotion.",
+  "Confidence calibration: whether high-confidence scans are more often confirmed than low-confidence scans.",
+  "Correction rate: how often users change the suggested emotion after a scan.",
+  "Data completeness: days with logs, missing notes, and skipped check-ins.",
+  "Support impact: whether coping strategies or caregiver follow-ups reduce repeated distress signals.",
+];
+
+const futureUpgradeRoadmap = [
+  {
+    title: "Multimodal emotion analysis",
+    detail:
+      "Combine facial emotion, optional voice tone, and text sentiment into one explainable result. This needs consent flows, signal weighting, and careful testing.",
+  },
+  {
+    title: "Therapist portal",
+    detail:
+      "Add therapist workspaces, assigned clients, session notes, shared reports, and role-specific permissions.",
+  },
+  {
+    title: "HIPAA-style data handling",
+    detail:
+      "Define encryption, audit logs, retention rules, consent, access reviews, incident response, and deployment controls before storing clinical data.",
+  },
+  {
+    title: "Deployment architecture",
+    detail:
+      "Document production hosting, Supabase RLS, secret management, observability, backups, and model/API boundaries.",
+  },
+];
 
 function emotionBarColor(label: string): string {
   const key = label.toLowerCase();
@@ -244,6 +284,64 @@ export default function ReportsPage() {
         </div>
       </section>
 
+      <section className="mt-10 rounded-2xl border border-[var(--border)] bg-[var(--emotion-surface,var(--bg-surface))] p-6">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h2 className="font-display text-2xl font-bold text-[var(--emotion-text,var(--text-primary))]">
+              Longitudinal emotion trends
+            </h2>
+            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-[var(--text-secondary)]">
+              Track patterns over time instead of treating one scan or one mood log as the whole story.
+            </p>
+          </div>
+          <span className="rounded-full border border-[var(--border)] px-3 py-1 font-mono text-xs text-[var(--text-muted)]">
+            Sample trend view
+          </span>
+        </div>
+        <div className="mt-6 h-72">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={sampleTrend}>
+              <CartesianGrid stroke="rgba(237,242,255,0.06)" vertical={false} />
+              <XAxis dataKey="date" tick={{ fill: "var(--text-muted)", fontSize: 12 }} />
+              <YAxis tick={{ fill: "var(--text-muted)", fontSize: 12 }} domain={[0, 100]} />
+              <Tooltip
+                contentStyle={{
+                  background: "var(--emotion-surface, var(--bg-elevated))",
+                  border: "1px solid var(--border)",
+                  borderRadius: 12,
+                  color: "var(--emotion-text, var(--text-primary))",
+                }}
+              />
+              <Legend />
+              <Line
+                type="monotone"
+                dataKey="positive"
+                name="Positive / regulated mood"
+                stroke="var(--accent-soft)"
+                strokeWidth={3}
+                dot={{ r: 4 }}
+              />
+              <Line
+                type="monotone"
+                dataKey="difficult"
+                name="Difficult mood signals"
+                stroke="var(--accent-alert)"
+                strokeWidth={3}
+                dot={{ r: 4 }}
+              />
+              <Line
+                type="monotone"
+                dataKey="scanConfidence"
+                name="Average scan confidence"
+                stroke="var(--emotion-accent,var(--accent-primary))"
+                strokeWidth={3}
+                dot={{ r: 4 }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      </section>
+
       <section className="mt-10 overflow-x-auto rounded-2xl border border-[var(--border)] bg-[var(--emotion-surface,var(--bg-surface))] p-6">
         <h2 className="font-display text-2xl font-bold text-[var(--emotion-text,var(--text-primary))]">
           Behaviour pattern table
@@ -351,6 +449,49 @@ export default function ReportsPage() {
           ) : (
             <p className="whitespace-pre-line">{narrative}</p>
           )}
+        </div>
+      </section>
+
+      <section className="mt-10 rounded-2xl border border-[var(--border)] bg-[var(--emotion-surface,var(--bg-surface))] p-6">
+        <h2 className="font-display text-2xl font-bold text-[var(--emotion-text,var(--text-primary))]">
+          Evaluation metrics
+        </h2>
+        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-[var(--text-secondary)]">
+          These are the real metrics to collect before claiming clinical-grade performance.
+        </p>
+        <div className="mt-5 grid gap-3 md:grid-cols-2">
+          {evaluationMetrics.map((metric) => (
+            <div
+              key={metric}
+              className="rounded-xl border border-[var(--border)] bg-[var(--bg-base)] p-4 text-sm leading-relaxed text-[var(--text-secondary)]"
+            >
+              {metric}
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="mt-10 mb-10 rounded-2xl border border-[var(--border)] bg-[var(--emotion-surface,var(--bg-surface))] p-6">
+        <h2 className="font-display text-2xl font-bold text-[var(--emotion-text,var(--text-primary))]">
+          Bigger upgrade roadmap
+        </h2>
+        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-[var(--text-secondary)]">
+          These upgrades are high value, but they need more design, privacy review, testing, and backend work before implementation.
+        </p>
+        <div className="mt-5 grid gap-4 md:grid-cols-2">
+          {futureUpgradeRoadmap.map((item) => (
+            <article
+              key={item.title}
+              className="rounded-xl border border-[var(--border)] bg-[var(--bg-base)] p-4"
+            >
+              <h3 className="font-body text-sm font-semibold text-[var(--emotion-text,var(--text-primary))]">
+                {item.title}
+              </h3>
+              <p className="mt-2 text-sm leading-relaxed text-[var(--text-secondary)]">
+                {item.detail}
+              </p>
+            </article>
+          ))}
         </div>
       </section>
     </div>

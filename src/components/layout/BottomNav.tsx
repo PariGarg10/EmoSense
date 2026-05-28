@@ -13,7 +13,7 @@ export default function BottomNav() {
       className="fixed bottom-0 left-0 right-0 z-40 border-t border-[var(--border)] bg-[var(--emotion-surface,#161C26)]/95 backdrop-blur-md transition-[background-color] duration-[600ms] ease-out md:hidden"
       aria-label="Primary"
     >
-      <ul className="grid grid-cols-6 px-1 py-1">
+      <ul className="grid grid-cols-9 px-1 py-1">
         {NAV_ITEMS.map((item) => {
           const active = pathname === item.href;
           const Icon = item.icon;

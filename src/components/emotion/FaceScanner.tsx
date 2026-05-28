@@ -100,6 +100,22 @@ function readAccentSoft(): string {
   return v || "#7ec8a4";
 }
 
+function getConfidenceBand(confidence: number): string {
+  if (confidence >= 75) return "High";
+  if (confidence >= 50) return "Medium";
+  return "Low";
+}
+
+function getConfidenceGuidance(confidence: number): string {
+  if (confidence >= 75) {
+    return "The model found one expression much stronger than the others.";
+  }
+  if (confidence >= 50) {
+    return "The model found a likely expression, but nearby emotions may also fit.";
+  }
+  return "This reading is uncertain. Use it as a prompt to check in, not as a final answer.";
+}
+
 function LockIcon({ className }: { className?: string }) {
   return (
     <svg
@@ -483,6 +499,9 @@ export default function FaceScanner({ onResult }: FaceScannerProps) {
   const liveLabel = liveEmotion
     ? getTheme(resolveThemeLookup(liveEmotion.emotion)).label
     : "";
+  const resultLabel = result
+    ? getTheme(resolveThemeLookup(result.emotion)).label
+    : "";
 
   return (
     <div className="space-y-8">
@@ -726,42 +745,60 @@ export default function FaceScanner({ onResult }: FaceScannerProps) {
             onDismiss={() => {}}
           />
 
-          <div className="max-h-[160px] w-full min-h-[140px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={chartData}
-                layout="vertical"
-                margin={{ left: 4, right: 40, top: 4, bottom: 4 }}
-              >
-                <XAxis type="number" domain={[0, 100]} hide />
-                <YAxis
-                  type="category"
-                  dataKey="name"
-                  width={72}
-                  tick={{
-                    fill: "var(--emotion-text, var(--text-secondary))",
-                    fontSize: 11,
-                  }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <Bar dataKey="value" radius={[0, 6, 6, 0]} barSize={12}>
-                  {chartData.map((row) => (
-                    <Cell key={row.name} fill={row.fill} />
-                  ))}
-                  <LabelList
-                    dataKey="value"
-                    position="right"
-                    formatter={(v: number) => `${v}%`}
-                    style={{
-                      fill: "var(--emotion-text, var(--text-primary))",
+          <div className="rounded-xl border border-[var(--border)]/50 bg-[var(--emotion-surface,var(--bg-elevated))] p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h3 className="font-body text-xs font-semibold uppercase tracking-wide text-[var(--emotion-text,var(--text-muted))] opacity-80">
+                  Model confidence scores
+                </h3>
+                <p className="mt-2 font-body text-sm text-[var(--emotion-text,var(--text-secondary))]">
+                  Top reading: {resultLabel} at {result.confidence}% confidence.
+                </p>
+              </div>
+              <span className="rounded-full border border-[var(--border)] px-3 py-1 font-mono text-xs text-[var(--emotion-text,var(--text-secondary))]">
+                {getConfidenceBand(result.confidence)} confidence
+              </span>
+            </div>
+            <div className="mt-4 max-h-[160px] w-full min-h-[140px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={chartData}
+                  layout="vertical"
+                  margin={{ left: 4, right: 40, top: 4, bottom: 4 }}
+                >
+                  <XAxis type="number" domain={[0, 100]} hide />
+                  <YAxis
+                    type="category"
+                    dataKey="name"
+                    width={72}
+                    tick={{
+                      fill: "var(--emotion-text, var(--text-secondary))",
                       fontSize: 11,
-                      fontFamily: "var(--font-mono)",
                     }}
+                    axisLine={false}
+                    tickLine={false}
                   />
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+                  <Bar dataKey="value" radius={[0, 6, 6, 0]} barSize={12}>
+                    {chartData.map((row) => (
+                      <Cell key={row.name} fill={row.fill} />
+                    ))}
+                    <LabelList
+                      dataKey="value"
+                      position="right"
+                      formatter={(v: number) => `${v}%`}
+                      style={{
+                        fill: "var(--emotion-text, var(--text-primary))",
+                        fontSize: 11,
+                        fontFamily: "var(--font-mono)",
+                      }}
+                    />
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            <p className="mt-3 text-xs leading-relaxed text-[var(--text-muted)]">
+              {getConfidenceGuidance(result.confidence)} These scores are not a diagnosis and should be paired with what the person says, their context, and caregiver judgment.
+            </p>
           </div>
 
           <div
@@ -773,8 +810,11 @@ export default function FaceScanner({ onResult }: FaceScannerProps) {
             }}
           >
             <h3 className="font-body text-xs font-semibold uppercase tracking-wide text-[var(--emotion-text,var(--text-muted))] opacity-80">
-              What this emotion means
+              Explainability and next step
             </h3>
+            <p className="mt-3 text-xs leading-relaxed text-[var(--text-muted)]">
+              The face reader compares visible expression patterns and shows the strongest matching emotions above, so users can see when a result is confident or mixed.
+            </p>
             {explanationLoading ? (
               <div className="mt-3 space-y-2" aria-busy="true">
                 <div className="h-3 w-full animate-pulse rounded bg-[var(--emotion-text)]/10" />
