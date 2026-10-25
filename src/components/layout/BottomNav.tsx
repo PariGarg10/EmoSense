@@ -10,17 +10,18 @@ export default function BottomNav() {
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-40 border-t border-[var(--border)] bg-[var(--emotion-surface,#161C26)]/95 backdrop-blur-md transition-[background-color] duration-[600ms] ease-out md:hidden"
+      className="fixed bottom-0 left-0 right-0 z-40 print:hidden border-t border-[var(--border)] bg-[var(--emotion-surface,#161C26)]/95 backdrop-blur-md transition-[background-color] duration-[600ms] ease-out md:hidden"
       aria-label="Primary"
     >
-      <ul className="grid grid-cols-9 px-1 py-1">
+      <ul className="flex overflow-x-auto px-1 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {NAV_ITEMS.map((item) => {
           const active = pathname === item.href;
           const Icon = item.icon;
           return (
-            <li key={item.href}>
+            <li key={item.href} className="min-w-[64px] flex-1 shrink-0">
               <Link
                 href={item.href}
+                aria-current={active ? "page" : undefined}
                 className={clsx(
                   "flex min-h-[52px] flex-col items-center justify-center gap-0.5 rounded-md px-1 transition-[color] duration-[600ms] ease-out",
                   active

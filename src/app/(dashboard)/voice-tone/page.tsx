@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Microphone, ShieldCheck, Waveform } from "@phosphor-icons/react";
 import Button from "@/src/components/ui/Button";
 import Card from "@/src/components/ui/Card";
+import { useEmoSenseStore } from "@/lib/store";
 
 type ToneResult = {
   label: string;
@@ -95,6 +96,7 @@ export default function VoiceTonePage() {
   const [liveVolume, setLiveVolume] = useState(0);
   const [error, setError] = useState("");
   const [result, setResult] = useState<ToneResult | null>(null);
+  const setLastVoiceTone = useEmoSenseStore((s) => s.setLastVoiceTone);
 
   const streamRef = useRef<MediaStream | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -133,7 +135,9 @@ export default function VoiceTonePage() {
       return;
     }
 
-    setResult(analyseTone(volumesRef.current, pitchMovementRef.current));
+    const tone = analyseTone(volumesRef.current, pitchMovementRef.current);
+    setResult(tone);
+    setLastVoiceTone({ label: tone.label, confidence: tone.confidence });
   }
 
   async function startAnalysis() {

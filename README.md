@@ -5,8 +5,8 @@ EmoSense is an autism-friendly emotion support app for reading, tracking, and ex
 ## Current Features
 
 - Landing page with feature cards, emotion preview, and caregiver-focused messaging.
-- Demo, local-only, and Supabase email/password sign-in flows.
-- Dashboard with emotion wheel, mood cards, recent activity, and quick actions.
+- Demo, device-only, and Supabase email/password sign-in, with "keep me signed in", password reset by email, sign-out, and redirect back to the page you were on.
+- Dashboard with greeting, emotion-wheel check-in (with optional note), today's mood, streak, last scan, weekly count, a 7-day mood strip, quick actions, and an editable recent log (edit notes, delete entries).
 - Face emotion scan through camera or image upload.
 - Model confidence scores and emotion distribution chart after scans.
 - Consent-based voice tone analysis using a short local microphone check.
@@ -16,9 +16,9 @@ EmoSense is an autism-friendly emotion support app for reading, tracking, and ex
 - Safety note that scan results are prompts, not diagnoses.
 - Mood and behaviour tracker with emotion, time of day, activity, energy, and notes.
 - Emotion dictionary with definitions, body signals, scenarios, and coping strategies.
-- Caregiver/therapist reports with charts, sortable logs, monthly AI narrative, longitudinal trend view, and print/PDF export.
-- Settings for font size, contrast, motion, theme, reminders, local data export/delete, and helplines.
-- Social stories page for common scenarios.
+- Reports for every role built from real logs: summary stats, emotion frequency, longitudinal trends, sortable log table, AI narrative, date-range filter, CSV export, and print/PDF.
+- Settings for profile and role, password change, sign-out, theme (dark/light/high-contrast light), font size, contrast, motion, daily reminders, full data export, and delete.
+- Social stories with step-by-step scenes, category filter, and read-aloud.
 
 ## Tech Stack
 
@@ -37,13 +37,13 @@ EmoSense is an autism-friendly emotion support app for reading, tracking, and ex
 
 ## Data And Integrations
 
-- Supabase tables for profiles, emotion logs, behaviour logs, and caregiver links.
-- Browser localStorage for sensory preferences and demo/local activity.
-- Browser sessionStorage for auth mode flags.
-- Local face model files in `public/models`, with CDN fallback.
+- All logs go through `src/lib/logRepository.ts`: Supabase for cloud accounts, localStorage (scoped per user) for demo and device-only accounts. If a cloud write fails, the entry is kept on the device so nothing is lost.
+- Device-only account passwords are stored as salted PBKDF2-SHA256 hashes (older plaintext entries are upgraded on next sign-in).
+- The active session is kept in localStorage ("keep me signed in") or sessionStorage (this tab only).
+- Local face model files in `public/models`, with CDN fallback. The Supabase SDK is only downloaded for cloud accounts.
 - Voice tone analysis runs locally in the browser; raw audio is not saved, uploaded, transcribed, or added to reports in the MVP.
-- Emotion fusion currently uses explicit user-entered/manual signals and does not persist fused results.
-- Helpbot sends short chat messages to `/api/helpbot`; it uses Anthropic when `ANTHROPIC_API_KEY` is available and a local fallback when it is not.
+- Emotion fusion prefills from your latest face scan and voice check; you can save the fused result to your log.
+- Helpbot, scan explanations, weekly insights, and report narratives use Claude (`claude-opus-5-5`, see `src/lib/claude.ts`) when `ANTHROPIC_API_KEY` is set, and deterministic local text when it is not or a request fails.
 - No payment integration is currently included.
 
 ## Implemented Upgrade Details
@@ -107,6 +107,12 @@ Held for a larger implementation pass:
 - HIPAA-style data handling plan with encryption, audit logs, retention, access reviews, and incident response.
 - Production deployment architecture with secrets, backups, observability, and RLS verification.
 - Formal evaluation using labeled data, agreement rates, calibration, correction rate, and user outcome metrics.
+
+## Database
+
+Run the SQL files in `supabase/migrations/` in order (001, 002, 003) in the Supabase SQL editor. Migration 003 adds the delete policies needed for deleting entries, plus indexes.
+
+In Supabase Auth settings, add `<your-site>/auth/callback` and `<your-site>/auth/reset` to the allowed redirect URLs so confirmation and password-reset emails work.
 
 ## Environment Variables
 

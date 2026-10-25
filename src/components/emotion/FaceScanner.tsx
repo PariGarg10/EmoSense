@@ -321,9 +321,11 @@ export default function FaceScanner({ onResult }: FaceScannerProps) {
 
     let detachVideo: HTMLVideoElement | null = null;
 
+    let busy = false;
     const tick = async () => {
       const v = videoRef.current;
-      if (!v || v.readyState < 2) return;
+      if (!v || v.readyState < 2 || busy || document.hidden) return;
+      busy = true;
       try {
         const det = await detectFromVideo(v);
         if (!det?.expressions) {
@@ -354,6 +356,8 @@ export default function FaceScanner({ onResult }: FaceScannerProps) {
       } catch {
         setFaceDetected(false);
         drawBox(null);
+      } finally {
+        busy = false;
       }
     };
 
@@ -366,6 +370,8 @@ export default function FaceScanner({ onResult }: FaceScannerProps) {
     startTickingRef.current = startTicking;
 
     async function boot() {
+      // Fetch model weights while the camera permission prompt is open.
+      void loadModels().catch(() => {});
       try {
         const stream = await acquireCameraStream();
         if (cancelled) {

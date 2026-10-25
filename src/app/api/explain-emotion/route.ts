@@ -7,8 +7,11 @@ export async function POST(req: Request) {
       emotion?: unknown;
       confidence?: unknown;
     };
-    const emotion = body.emotion as string;
-    const confidence = body.confidence as number;
+    const emotion = typeof body.emotion === "string" ? body.emotion : "";
+    const confidence = typeof body.confidence === "number" ? body.confidence : 0;
+    if (!emotion.trim()) {
+      return NextResponse.json({ error: "Emotion is required." }, { status: 400 });
+    }
     const explanation = await explainEmotion(emotion, confidence);
     return NextResponse.json({ explanation });
   } catch {

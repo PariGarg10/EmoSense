@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CaretDoubleLeft, CaretDoubleRight } from "@phosphor-icons/react";
+import { CaretDoubleLeft, CaretDoubleRight, SignOut } from "@phosphor-icons/react";
 import clsx from "clsx";
 import { NAV_ITEMS } from "@/src/components/layout/navItems";
+import { useEmoSenseStore } from "@/lib/store";
+import { signOut } from "@/src/lib/authGate";
 
 export type SidebarProps = {
   collapsed: boolean;
@@ -13,11 +15,12 @@ export type SidebarProps = {
 
 export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const pathname = usePathname();
+  const user = useEmoSenseStore((s) => s.user);
 
   return (
     <aside
       className={clsx(
-        "hidden h-screen shrink-0 flex-col border-r border-[var(--border)] bg-[var(--emotion-surface,#161C26)] transition-[width,background-color] duration-300 ease-out md:flex",
+        "sticky top-0 hidden h-screen shrink-0 flex-col border-r print:!hidden border-[var(--border)] bg-[var(--emotion-surface,#161C26)] transition-[width,background-color] duration-300 ease-out md:flex",
         collapsed ? "w-[60px]" : "w-[240px]",
       )}
       aria-label="Section navigation"
@@ -32,6 +35,7 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
             <Link
               key={item.href}
               href={item.href}
+              aria-current={active ? "page" : undefined}
               title={collapsed ? item.label : undefined}
               className={clsx(
                 "flex min-h-[44px] items-center gap-3 rounded-md px-3 text-[var(--text-secondary)] transition-[background-color,color,border-color] duration-300 ease-out",
@@ -57,6 +61,31 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
           );
         })}
       </nav>
+
+      <div className={clsx("mx-2 mb-2 border-t border-[var(--border)] pt-3", collapsed && "text-center")}>
+        {!collapsed && user && (
+          <div className="mb-2 px-1">
+            <p className="truncate font-body text-sm font-medium text-[var(--text-primary)]">
+              {user.displayName || "Signed in"}
+            </p>
+            {user.email && (
+              <p className="truncate font-body text-xs text-[var(--text-muted)]">{user.email}</p>
+            )}
+          </div>
+        )}
+        <button
+          type="button"
+          onClick={() => void signOut()}
+          className={clsx(
+            "flex min-h-[44px] w-full items-center gap-2 rounded-md px-3 text-[var(--text-secondary)] transition-colors hover:bg-[var(--glow)] hover:text-[var(--text-primary)]",
+            collapsed && "justify-center px-0",
+          )}
+          title={collapsed ? "Sign out" : undefined}
+        >
+          <SignOut size={20} aria-hidden />
+          {collapsed ? <span className="sr-only">Sign out</span> : <span className="font-body text-sm">Sign out</span>}
+        </button>
+      </div>
 
       <button
         type="button"

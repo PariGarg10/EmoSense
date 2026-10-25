@@ -1,12 +1,9 @@
-import Anthropic from "@anthropic-ai/sdk";
+import type Anthropic from "@anthropic-ai/sdk";
 import { NextResponse } from "next/server";
+import { askClaude, isClaudeConfigured } from "@/src/lib/claude";
 
-type ChatMessage = {
-  role: "user" | "assistant";
-  content: string;
-};
+type ChatMessage = Anthropic.MessageParam & { content: string };
 
-const MODEL = "claude-sonnet-4-20250514";
 const MAX_HISTORY = 8;
 const crisisWords = [
   "suicide",
@@ -16,6 +13,10 @@ const crisisWords = [
   "self-harm",
   "end my life",
   "want to die",
+  "kill me",
+  "don't want to live",
+  "dont want to live",
+  "better off dead",
 ];
 
 function cleanText(value: unknown): string {
@@ -64,12 +65,6 @@ function fallbackReply(message: string): string {
   return "I can help you name the feeling and choose one next step. Try this: say what happened, pick one feeling word, then choose one support action like water, quiet time, breathing, or asking for help.";
 }
 
-function textFromMessage(content: Anthropic.Messages.Message["content"]): string {
-  const block = content[0];
-  if (block?.type === "text") return block.text.trim();
-  return "";
-}
-
 export async function POST(req: Request) {
   try {
     const body = (await req.json()) as { message?: unknown; messages?: unknown };
@@ -83,32 +78,26 @@ export async function POST(req: Request) {
       );
     }
 
-    if (!process.env.ANTHROPIC_API_KEY?.trim()) {
-      return NextResponse.json({ reply: fallbackReply(message), source: "fallback" });
-    }
-
     if (containsCrisisLanguage(message)) {
       return NextResponse.json({ reply: fallbackReply(message), source: "safety" });
     }
 
-    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-    const response = await client.messages.create({
-      model: MODEL,
-      max_tokens: 260,
+    if (!isClaudeConfigured()) {
+      return NextResponse.json({ reply: fallbackReply(message), source: "fallback" });
+    }
+
+    // The API requires the first turn to be from the user.
+    while (history.length && history[0].role !== "user") history.shift();
+
+    const reply = await askClaude({
       system:
         "You are EmoSense Helpbot for autistic users, caregivers, and therapists. Use plain, concrete language. Keep replies under 5 short sentences. Be warm, non-clinical, non-judgmental, and sensory-aware. Do not diagnose, do not claim certainty, and do not provide medical or emergency instructions beyond telling the user to contact trusted people or emergency services if safety is at risk. Prefer one feeling label, one possible reason, and one small next step.",
-      messages: [
-        ...history.map((item) => ({
-          role: item.role,
-          content: item.content,
-        })),
-        { role: "user" as const, content: message },
-      ],
+      messages: [...history, { role: "user", content: message }],
     });
 
     return NextResponse.json({
-      reply: textFromMessage(response.content) || fallbackReply(message),
-      source: "anthropic",
+      reply: reply ?? fallbackReply(message),
+      source: reply ? "anthropic" : "fallback",
     });
   } catch {
     return NextResponse.json(

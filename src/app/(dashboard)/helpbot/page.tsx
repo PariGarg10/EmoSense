@@ -175,6 +175,14 @@ export default function HelpbotPage() {
                 id="helpbot-message"
                 value={input}
                 onChange={(event) => setInput(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+                    event.preventDefault();
+                    void sendMessage();
+                  }
+                }}
+                maxLength={1200}
+                aria-describedby="helpbot-hint"
                 placeholder="Type what happened or how you feel..."
                 rows={2}
                 className="min-h-[52px] flex-1 resize-none rounded-xl border border-[var(--border)] bg-[var(--bg-base)] px-4 py-3 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--emotion-accent,var(--accent-primary))]"
@@ -186,6 +194,9 @@ export default function HelpbotPage() {
                 </span>
               </Button>
             </form>
+            <p id="helpbot-hint" className="mt-2 text-xs text-[var(--text-muted)]">
+              Press Enter to send, Shift + Enter for a new line.
+            </p>
           </div>
         </Card>
 

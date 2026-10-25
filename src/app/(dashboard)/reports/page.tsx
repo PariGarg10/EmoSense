@@ -1,71 +1,54 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useEffect, useMemo, useState } from "react";
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Legend,
-  Line,
-  LineChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
 import { CaretDown, CaretUp } from "@phosphor-icons/react";
 import Button from "@/components/ui/Button";
 import { generateMonthlyReport } from "@/lib/ai";
-import type { LogEntry, UserRole } from "@/lib/types";
+import type { LogEntry } from "@/lib/types";
 import { useEmoSenseStore } from "@/lib/store";
-import { EMOTION_THEMES } from "@/src/lib/emotionTheme";
-import { createClient } from "@/src/lib/supabase";
+import { useUserLogs } from "@/src/hooks/useUserLogs";
+import { getTheme } from "@/src/lib/emotionTheme";
+import { dayKey } from "@/src/lib/logRepository";
 
-const chartEmotions = ["Joy", "Calm", "Sadness", "Anger", "Fear", "Surprise"] as const;
+const chartFallback = () => (
+  <div className="h-full w-full animate-pulse rounded-xl bg-[var(--bg-base)]" />
+);
+const FrequencyChart = dynamic(
+  () => import("@/src/components/charts/ReportCharts").then((m) => m.FrequencyChart),
+  { ssr: false, loading: chartFallback },
+);
+const TrendChart = dynamic(
+  () => import("@/src/components/charts/ReportCharts").then((m) => m.TrendChart),
+  { ssr: false, loading: chartFallback },
+);
 
-const sampleBars = [
-  { date: "May 1", Joy: 2, Calm: 3, Sadness: 0, Anger: 0, Fear: 1, Surprise: 0 },
-  { date: "May 2", Joy: 1, Calm: 2, Sadness: 1, Anger: 0, Fear: 0, Surprise: 1 },
-  { date: "May 3", Joy: 0, Calm: 1, Sadness: 2, Anger: 1, Fear: 0, Surprise: 0 },
-  { date: "May 4", Joy: 3, Calm: 2, Sadness: 0, Anger: 0, Fear: 1, Surprise: 1 },
-  { date: "May 5", Joy: 1, Calm: 4, Sadness: 1, Anger: 0, Fear: 0, Surprise: 0 },
-];
+const POSITIVE = new Set(["Happy", "Calm", "Affectionate", "Trusting", "Accepting"]);
+const DIFFICULT = new Set([
+  "Sad",
+  "Angry",
+  "Scared",
+  "Anxious",
+  "Lonely",
+  "Disgusted",
+  "Confused",
+  "Embarrassed",
+  "Envious",
+]);
 
-const sampleTrend = [
-  { date: "Week 1", positive: 62, difficult: 24, scanConfidence: 71 },
-  { date: "Week 2", positive: 58, difficult: 31, scanConfidence: 68 },
-  { date: "Week 3", positive: 66, difficult: 20, scanConfidence: 74 },
-  { date: "Week 4", positive: 72, difficult: 18, scanConfidence: 77 },
-];
+type Row = {
+  id: string;
+  logged_at: string;
+  emotion: string;
+  source: string;
+  time_of_day?: string;
+  activities?: string[];
+  energy_level?: number;
+  confidence?: number;
+  note?: string;
+};
 
-const sampleRows: LogEntry[] = [
-  {
-    logged_at: "2026-05-12T08:10:00.000Z",
-    emotion: "Calm",
-    time_of_day: "Morning",
-    activities: ["Home"],
-    energy_level: 3,
-    note: "Slow start, music helped",
-  },
-  {
-    logged_at: "2026-05-12T15:40:00.000Z",
-    emotion: "Joy",
-    time_of_day: "Afternoon",
-    activities: ["School"],
-    energy_level: 4,
-    note: "Finished art project",
-  },
-  {
-    logged_at: "2026-05-11T19:05:00.000Z",
-    emotion: "Sadness",
-    time_of_day: "Evening",
-    activities: ["Screen time"],
-    energy_level: 2,
-    note: "Missed friend call",
-  },
-];
-
-type SortKey = "logged_at" | "emotion" | "energy_level";
+type SortKey = "logged_at" | "emotion" | "energy_level" | "source";
 
 const evaluationMetrics = [
   "Scan agreement rate: how often the user or caregiver agrees with the detected emotion.",
@@ -75,106 +58,153 @@ const evaluationMetrics = [
   "Support impact: whether coping strategies or caregiver follow-ups reduce repeated distress signals.",
 ];
 
-const futureUpgradeRoadmap = [
-  {
-    title: "Multimodal emotion analysis",
-    detail:
-      "Combine facial emotion, optional voice tone, and text sentiment into one explainable result. This needs consent flows, signal weighting, and careful testing.",
-  },
-  {
-    title: "Therapist portal",
-    detail:
-      "Add therapist workspaces, assigned clients, session notes, shared reports, and role-specific permissions.",
-  },
-  {
-    title: "HIPAA-style data handling",
-    detail:
-      "Define encryption, audit logs, retention rules, consent, access reviews, incident response, and deployment controls before storing clinical data.",
-  },
-  {
-    title: "Deployment architecture",
-    detail:
-      "Document production hosting, Supabase RLS, secret management, observability, backups, and model/API boundaries.",
-  },
-];
-
-function emotionBarColor(label: string): string {
-  const key = label.toLowerCase();
-  const theme =
-    EMOTION_THEMES[key] ??
-    EMOTION_THEMES[key.replace(/ness$/, "")] ??
-    EMOTION_THEMES["neutral"];
-  return theme?.accentColor ?? "#5B8DEF";
+function toInputDate(d: Date) {
+  return dayKey(d);
 }
 
-const palette = Object.fromEntries(
-  chartEmotions.map((e) => [e, emotionBarColor(e)]),
-) as Record<(typeof chartEmotions)[number], string>;
+function startOfDay(value: string) {
+  const [y, m, d] = value.split("-").map(Number);
+  return new Date(y, (m ?? 1) - 1, d ?? 1, 0, 0, 0, 0);
+}
+
+function endOfDay(value: string) {
+  const [y, m, d] = value.split("-").map(Number);
+  return new Date(y, (m ?? 1) - 1, d ?? 1, 23, 59, 59, 999);
+}
+
+function csvCell(value: unknown) {
+  const s = value == null ? "" : String(value);
+  // Neutralise spreadsheet formulas and quote everything.
+  const safe = /^[=+\-@]/.test(s) ? `'${s}` : s;
+  return `"${safe.replace(/"/g, '""')}"`;
+}
 
 export default function ReportsPage() {
-  const storeRole = useEmoSenseStore((s) => s.userRole);
-  const [profileRole, setProfileRole] = useState<UserRole | null>(null);
-  const [roleLoading, setRoleLoading] = useState(true);
+  const role = useEmoSenseStore((s) => s.userRole);
+  const user = useEmoSenseStore((s) => s.user);
+  const { emotionLogs, behaviourLogs, loading } = useUserLogs();
+
   const [sortKey, setSortKey] = useState<SortKey>("logged_at");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [narrative, setNarrative] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [startDate, setStartDate] = useState("2026-05-01");
-  const [endDate, setEndDate] = useState("2026-05-31");
+  const [narrativeLoading, setNarrativeLoading] = useState(false);
+  const [startDate, setStartDate] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 29);
+    return toInputDate(d);
+  });
+  const [endDate, setEndDate] = useState(() => toInputDate(new Date()));
 
-  const role = profileRole ?? storeRole;
-  const allowed = role === "caregiver" || role === "therapist";
+  const rows = useMemo<Row[]>(() => {
+    const from = startOfDay(startDate).toISOString();
+    const to = endOfDay(endDate).toISOString();
+    const inRange = (iso: string) => iso >= from && iso <= to;
+    return [
+      ...emotionLogs.filter((l) => inRange(l.logged_at)).map<Row>((l) => ({
+        id: l.id,
+        logged_at: l.logged_at,
+        emotion: getTheme(l.emotion).label,
+        source: l.source === "scan" ? "Face scan" : "Check-in",
+        confidence: l.confidence ?? undefined,
+        note: l.note ?? undefined,
+      })),
+      ...behaviourLogs.filter((l) => inRange(l.logged_at)).map<Row>((l) => ({
+        id: l.id,
+        logged_at: l.logged_at,
+        emotion: getTheme(l.emotion).label,
+        source: "Mood tracker",
+        time_of_day: l.time_of_day ?? undefined,
+        activities: l.activities ?? [],
+        energy_level: l.energy_level ?? undefined,
+        note: l.note ?? undefined,
+      })),
+    ];
+  }, [emotionLogs, behaviourLogs, startDate, endDate]);
 
-  useEffect(() => {
-    const supabase = createClient();
-    if (!supabase) {
-      setRoleLoading(false);
-      return;
+  const { barData, barEmotions, trendData, summary } = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const r of rows) counts.set(r.emotion, (counts.get(r.emotion) ?? 0) + 1);
+    const barEmotions = [...counts.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 6)
+      .map(([e]) => e);
+
+    const start = startOfDay(startDate);
+    const end = endOfDay(endDate);
+    const spanDays = Math.max(1, Math.round((end.getTime() - start.getTime()) / 86400000));
+    // Group by day for short ranges, by week for long ones.
+    const bucketDays = spanDays > 31 ? 7 : 1;
+    const buckets: { key: string; label: string; from: Date; to: Date }[] = [];
+    for (let t = new Date(start); t <= end; t.setDate(t.getDate() + bucketDays)) {
+      const from = new Date(t);
+      const to = new Date(t);
+      to.setDate(to.getDate() + bucketDays);
+      buckets.push({
+        key: dayKey(from),
+        label: from.toLocaleDateString([], { month: "short", day: "numeric" }),
+        from,
+        to,
+      });
     }
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (!session?.user) {
-        setRoleLoading(false);
-        return;
-      }
-      const { data } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", session.user.id)
-        .maybeSingle();
-      if (data?.role === "user" || data?.role === "caregiver" || data?.role === "therapist") {
-        setProfileRole(data.role);
-      }
-      setRoleLoading(false);
-    });
-  }, []);
-
-  useEffect(() => {
-    if (!allowed) return;
-    let cancelled = false;
-    async function run() {
-      setLoading(true);
-      try {
-        const text = await generateMonthlyReport(
-          sampleRows,
-          role === "therapist" ? "therapist" : "caregiver",
-        );
-        if (!cancelled) setNarrative(text);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-    run();
-    return () => {
-      cancelled = true;
+    const bucketOf = (iso: string) => {
+      const when = new Date(iso);
+      return buckets.find((b) => when >= b.from && when < b.to);
     };
-  }, [allowed, role]);
+
+    const barMap = new Map<string, Record<string, string | number>>();
+    const trendMap = new Map<string, { pos: number; diff: number; total: number; conf: number[] }>();
+    for (const b of buckets) {
+      barMap.set(b.key, Object.fromEntries([["date", b.label], ...barEmotions.map((e) => [e, 0])]));
+      trendMap.set(b.key, { pos: 0, diff: 0, total: 0, conf: [] });
+    }
+    for (const r of rows) {
+      const b = bucketOf(r.logged_at);
+      if (!b) continue;
+      const bar = barMap.get(b.key)!;
+      if (barEmotions.includes(r.emotion)) bar[r.emotion] = (bar[r.emotion] as number) + 1;
+      const t = trendMap.get(b.key)!;
+      t.total += 1;
+      if (POSITIVE.has(r.emotion)) t.pos += 1;
+      if (DIFFICULT.has(r.emotion)) t.diff += 1;
+      if (r.confidence != null) t.conf.push(r.confidence);
+    }
+
+    const trendData = buckets.map((b) => {
+      const t = trendMap.get(b.key)!;
+      return {
+        date: b.label,
+        positive: t.total ? Math.round((t.pos / t.total) * 100) : null,
+        difficult: t.total ? Math.round((t.diff / t.total) * 100) : null,
+        scanConfidence: t.conf.length
+          ? Math.round(t.conf.reduce((a, c) => a + c, 0) / t.conf.length)
+          : null,
+      };
+    });
+
+    const days = new Set(rows.map((r) => dayKey(new Date(r.logged_at))));
+    const energies = rows.map((r) => r.energy_level).filter((v): v is number => v != null);
+    return {
+      barData: [...barMap.values()],
+      barEmotions,
+      trendData,
+      summary: {
+        total: rows.length,
+        activeDays: days.size,
+        spanDays,
+        top: barEmotions[0] ?? null,
+        avgEnergy: energies.length ? energies.reduce((a, b) => a + b, 0) / energies.length : null,
+        scans: rows.filter((r) => r.source === "Face scan").length,
+      },
+    };
+  }, [rows, startDate, endDate]);
 
   const sortedRows = useMemo(() => {
-    const rows = [...sampleRows];
-    rows.sort((a, b) => {
+    return [...rows].sort((a, b) => {
       const av = a[sortKey];
       const bv = b[sortKey];
-      if (av == null || bv == null) return 0;
+      if (av == null && bv == null) return 0;
+      if (av == null) return 1;
+      if (bv == null) return -1;
       if (typeof av === "number" && typeof bv === "number") {
         return sortDir === "asc" ? av - bv : bv - av;
       }
@@ -182,8 +212,32 @@ export default function ReportsPage() {
         ? String(av).localeCompare(String(bv))
         : String(bv).localeCompare(String(av));
     });
-    return rows;
-  }, [sortDir, sortKey]);
+  }, [rows, sortDir, sortKey]);
+
+  async function writeNarrative() {
+    setNarrativeLoading(true);
+    try {
+      const payload: LogEntry[] = rows.slice(0, 120).map((r) => ({
+        logged_at: r.logged_at,
+        emotion: r.emotion,
+        time_of_day: r.time_of_day,
+        activities: r.activities,
+        energy_level: r.energy_level,
+        note: r.note,
+      }));
+      setNarrative(await generateMonthlyReport(payload, role));
+    } catch {
+      setNarrative("The summary could not be written right now. Your charts and table are still accurate.");
+    } finally {
+      setNarrativeLoading(false);
+    }
+  }
+
+  // Draft a summary once data is available; later ranges use the button.
+  useEffect(() => {
+    if (!loading && !narrative && !narrativeLoading) void writeNarrative();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading]);
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) {
@@ -194,26 +248,55 @@ export default function ReportsPage() {
     }
   }
 
-  if (roleLoading) {
-    return (
-      <div className="text-[var(--text-secondary)]">
-        <p>Loading reports…</p>
-      </div>
-    );
+  function exportCsv() {
+    const header = ["Date", "Time", "Emotion", "Source", "Time of day", "Activities", "Energy", "Confidence", "Note"];
+    const lines = sortedRows.map((r) => {
+      const d = new Date(r.logged_at);
+      return [
+        d.toLocaleDateString(),
+        d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        r.emotion,
+        r.source,
+        r.time_of_day,
+        r.activities?.join("; "),
+        r.energy_level,
+        r.confidence != null ? Math.round(r.confidence) : "",
+        r.note,
+      ]
+        .map(csvCell)
+        .join(",");
+    });
+    const blob = new Blob([[header.map(csvCell).join(","), ...lines].join("\n")], {
+      type: "text/csv;charset=utf-8",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `emosense-report-${startDate}-to-${endDate}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
-  if (!allowed) {
-    return (
-      <div>
-        <h1 className="font-display text-4xl font-bold text-[var(--emotion-text,var(--text-primary))]">
-          Reports
-        </h1>
-        <p className="mt-4 max-w-xl text-[var(--text-secondary)]">
-          Ask your caregiver for access
-        </p>
-      </div>
-    );
-  }
+  const sortButton = (key: SortKey, label: string) => (
+    <button
+      type="button"
+      className="inline-flex min-h-[44px] items-center gap-1 text-[var(--text-secondary)]"
+      onClick={() => toggleSort(key)}
+      aria-sort={sortKey === key ? (sortDir === "asc" ? "ascending" : "descending") : undefined}
+    >
+      {label}
+      {sortKey === key ? (
+        sortDir === "asc" ? (
+          <CaretUp aria-hidden size={16} />
+        ) : (
+          <CaretDown aria-hidden size={16} />
+        )
+      ) : null}
+    </button>
+  );
+
+  const sectionClass =
+    "mt-10 rounded-2xl border border-[var(--border)] bg-[var(--emotion-surface,var(--bg-surface))] p-6 print:break-inside-avoid";
 
   return (
     <div>
@@ -223,16 +306,20 @@ export default function ReportsPage() {
             Reports
           </h1>
           <p className="mt-3 max-w-2xl text-[var(--text-secondary)]">
-            Emotion frequency, behaviour patterns, and a monthly narrative for your care team.
+            {role === "user"
+              ? "Your emotion patterns over time. Share this page with your caregiver or therapist if you like."
+              : "Emotion frequency, behaviour patterns, and a narrative summary for the care team."}
+            {user?.displayName ? ` Report for ${user.displayName}.` : ""}
           </p>
         </div>
-        <div className="flex flex-wrap items-end gap-3">
+        <div className="flex flex-wrap items-end gap-3 print:hidden">
           <label className="flex min-h-[44px] flex-col text-xs text-[var(--text-muted)]">
             From
             <input
               type="date"
               value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
+              max={endDate}
+              onChange={(e) => e.target.value && setStartDate(e.target.value)}
               className="mt-1 min-h-[44px] rounded-lg border border-[var(--border)] bg-[var(--emotion-surface,var(--bg-surface))] px-3 text-sm text-[var(--text-primary)]"
             />
           </label>
@@ -241,223 +328,160 @@ export default function ReportsPage() {
             <input
               type="date"
               value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
+              min={startDate}
+              onChange={(e) => e.target.value && setEndDate(e.target.value)}
               className="mt-1 min-h-[44px] rounded-lg border border-[var(--border)] bg-[var(--emotion-surface,var(--bg-surface))] px-3 text-sm text-[var(--text-primary)]"
             />
           </label>
+          <Button type="button" variant="ghost" onClick={exportCsv} disabled={rows.length === 0}>
+            Export CSV
+          </Button>
           <Button type="button" variant="ghost" onClick={() => window.print()}>
-            Export PDF
+            Print / PDF
           </Button>
         </div>
       </header>
 
-      <section className="mt-10 rounded-2xl border border-[var(--border)] bg-[var(--emotion-surface,var(--bg-surface))] p-6">
-        <h2 className="font-display text-2xl font-bold text-[var(--emotion-text,var(--text-primary))]">
-          Emotion frequency
-        </h2>
-        <div className="mt-6 h-72">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={sampleBars}>
-              <CartesianGrid stroke="rgba(237,242,255,0.06)" vertical={false} />
-              <XAxis dataKey="date" tick={{ fill: "var(--text-muted)", fontSize: 12 }} />
-              <YAxis tick={{ fill: "var(--text-muted)", fontSize: 12 }} />
-              <Tooltip
-                contentStyle={{
-                  background: "var(--emotion-surface, var(--bg-elevated))",
-                  border: "1px solid var(--border)",
-                  borderRadius: 12,
-                  color: "var(--emotion-text, var(--text-primary))",
-                }}
-              />
-              <Legend />
-              {chartEmotions.map((key) => (
-                <Bar
-                  key={key}
-                  dataKey={key}
-                  stackId="emo"
-                  fill={palette[key]}
-                  radius={[4, 4, 0, 0]}
-                />
-              ))}
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
+      <section className="mt-8 grid grid-cols-2 gap-4 md:grid-cols-4">
+        {[
+          ["Entries", loading ? "…" : String(summary.total)],
+          ["Days logged", loading ? "…" : `${summary.activeDays} / ${summary.spanDays}`],
+          ["Most common", summary.top ?? "—"],
+          ["Avg energy", summary.avgEnergy != null ? `${summary.avgEnergy.toFixed(1)} / 5` : "—"],
+        ].map(([label, value]) => (
+          <div
+            key={label}
+            className="rounded-2xl border border-[var(--border)] bg-[var(--emotion-surface,var(--bg-surface))] p-4"
+          >
+            <p className="text-xs text-[var(--text-muted)]">{label}</p>
+            <p className="mt-2 font-display text-2xl font-bold">{value}</p>
+          </div>
+        ))}
       </section>
 
-      <section className="mt-10 rounded-2xl border border-[var(--border)] bg-[var(--emotion-surface,var(--bg-surface))] p-6">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
+      {!loading && rows.length === 0 ? (
+        <p className="mt-10 rounded-2xl border border-dashed border-[var(--border)] p-8 text-center text-[var(--text-secondary)]">
+          No entries between these dates. Save check-ins, face scans, or mood entries and they will appear here.
+        </p>
+      ) : (
+        <>
+          <section className={sectionClass}>
+            <h2 className="font-display text-2xl font-bold text-[var(--emotion-text,var(--text-primary))]">
+              Emotion frequency
+            </h2>
+            <div className="mt-6 h-72">
+              <FrequencyChart data={barData} emotions={barEmotions} />
+            </div>
+          </section>
+
+          <section className={sectionClass}>
             <h2 className="font-display text-2xl font-bold text-[var(--emotion-text,var(--text-primary))]">
               Longitudinal emotion trends
             </h2>
             <p className="mt-2 max-w-2xl text-sm leading-relaxed text-[var(--text-secondary)]">
-              Track patterns over time instead of treating one scan or one mood log as the whole story.
+              Share of entries that were positive or difficult in each {summary.spanDays > 31 ? "week" : "day"}.
+              Look at patterns over time instead of treating one scan or one log as the whole story.
             </p>
-          </div>
-          <span className="rounded-full border border-[var(--border)] px-3 py-1 font-mono text-xs text-[var(--text-muted)]">
-            Sample trend view
-          </span>
-        </div>
-        <div className="mt-6 h-72">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={sampleTrend}>
-              <CartesianGrid stroke="rgba(237,242,255,0.06)" vertical={false} />
-              <XAxis dataKey="date" tick={{ fill: "var(--text-muted)", fontSize: 12 }} />
-              <YAxis tick={{ fill: "var(--text-muted)", fontSize: 12 }} domain={[0, 100]} />
-              <Tooltip
-                contentStyle={{
-                  background: "var(--emotion-surface, var(--bg-elevated))",
-                  border: "1px solid var(--border)",
-                  borderRadius: 12,
-                  color: "var(--emotion-text, var(--text-primary))",
-                }}
-              />
-              <Legend />
-              <Line
-                type="monotone"
-                dataKey="positive"
-                name="Positive / regulated mood"
-                stroke="var(--accent-soft)"
-                strokeWidth={3}
-                dot={{ r: 4 }}
-              />
-              <Line
-                type="monotone"
-                dataKey="difficult"
-                name="Difficult mood signals"
-                stroke="var(--accent-alert)"
-                strokeWidth={3}
-                dot={{ r: 4 }}
-              />
-              <Line
-                type="monotone"
-                dataKey="scanConfidence"
-                name="Average scan confidence"
-                stroke="var(--emotion-accent,var(--accent-primary))"
-                strokeWidth={3}
-                dot={{ r: 4 }}
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-      </section>
+            <div className="mt-6 h-72">
+              <TrendChart data={trendData} />
+            </div>
+          </section>
 
-      <section className="mt-10 overflow-x-auto rounded-2xl border border-[var(--border)] bg-[var(--emotion-surface,var(--bg-surface))] p-6">
-        <h2 className="font-display text-2xl font-bold text-[var(--emotion-text,var(--text-primary))]">
-          Behaviour pattern table
-        </h2>
-        <table className="mt-6 w-full min-w-[720px] border-collapse text-left text-sm">
-          <thead>
-            <tr className="text-[var(--text-muted)]">
-              <th className="border-b border-[var(--border)] p-3 font-mono-label text-xs uppercase tracking-wide">
-                <button
-                  type="button"
-                  className="inline-flex min-h-[44px] items-center gap-1 text-[var(--text-secondary)]"
-                  onClick={() => toggleSort("logged_at")}
-                >
-                  Date
-                  {sortKey === "logged_at" ? (
-                    sortDir === "asc" ? (
-                      <CaretUp aria-hidden size={16} />
-                    ) : (
-                      <CaretDown aria-hidden size={16} />
-                    )
-                  ) : null}
-                </button>
-              </th>
-              <th className="border-b border-[var(--border)] p-3 font-mono-label text-xs uppercase tracking-wide">
-                Time
-              </th>
-              <th className="border-b border-[var(--border)] p-3 font-mono-label text-xs uppercase tracking-wide">
-                <button
-                  type="button"
-                  className="inline-flex min-h-[44px] items-center gap-1 text-[var(--text-secondary)]"
-                  onClick={() => toggleSort("emotion")}
-                >
-                  Emotion
-                  {sortKey === "emotion" ? (
-                    sortDir === "asc" ? (
-                      <CaretUp aria-hidden size={16} />
-                    ) : (
-                      <CaretDown aria-hidden size={16} />
-                    )
-                  ) : null}
-                </button>
-              </th>
-              <th className="border-b border-[var(--border)] p-3 font-mono-label text-xs uppercase tracking-wide">
-                Activity
-              </th>
-              <th className="border-b border-[var(--border)] p-3 font-mono-label text-xs uppercase tracking-wide">
-                <button
-                  type="button"
-                  className="inline-flex min-h-[44px] items-center gap-1 text-[var(--text-secondary)]"
-                  onClick={() => toggleSort("energy_level")}
-                >
-                  Energy
-                  {sortKey === "energy_level" ? (
-                    sortDir === "asc" ? (
-                      <CaretUp aria-hidden size={16} />
-                    ) : (
-                      <CaretDown aria-hidden size={16} />
-                    )
-                  ) : null}
-                </button>
-              </th>
-              <th className="border-b border-[var(--border)] p-3 font-mono-label text-xs uppercase tracking-wide">
-                Notes
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {sortedRows.map((row) => (
-              <tr
-                key={row.logged_at}
-                className="transition-colors duration-[var(--motion-duration)] ease-out hover:bg-[var(--glow)]"
-              >
-                <td className="border-b border-[var(--border)] p-3 font-mono-label text-xs text-[var(--text-secondary)]">
-                  {new Date(row.logged_at).toLocaleDateString()}
-                </td>
-                <td className="border-b border-[var(--border)] p-3 font-mono-label text-xs text-[var(--text-secondary)]">
-                  {new Date(row.logged_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                </td>
-                <td className="border-b border-[var(--border)] p-3 text-[var(--emotion-text,var(--text-primary))]">
-                  {row.emotion}
-                </td>
-                <td className="border-b border-[var(--border)] p-3 text-[var(--text-secondary)]">
-                  {(row.time_of_day ?? "") +
-                    (row.activities?.length ? ` · ${row.activities.join(", ")}` : "")}
-                </td>
-                <td className="border-b border-[var(--border)] p-3 text-[var(--text-secondary)]">
-                  {row.energy_level ?? "—"}
-                </td>
-                <td className="border-b border-[var(--border)] p-3 text-[var(--text-secondary)]">
-                  {row.note ?? "—"}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </section>
+          <section className={`${sectionClass} overflow-x-auto`}>
+            <h2 className="font-display text-2xl font-bold text-[var(--emotion-text,var(--text-primary))]">
+              Log table
+            </h2>
+            <table className="mt-6 w-full min-w-[760px] border-collapse text-left text-sm">
+              <thead>
+                <tr className="text-[var(--text-muted)]">
+                  <th className="border-b border-[var(--border)] p-3 text-xs uppercase tracking-wide">
+                    {sortButton("logged_at", "Date")}
+                  </th>
+                  <th className="border-b border-[var(--border)] p-3 text-xs uppercase tracking-wide">Time</th>
+                  <th className="border-b border-[var(--border)] p-3 text-xs uppercase tracking-wide">
+                    {sortButton("emotion", "Emotion")}
+                  </th>
+                  <th className="border-b border-[var(--border)] p-3 text-xs uppercase tracking-wide">
+                    {sortButton("source", "Source")}
+                  </th>
+                  <th className="border-b border-[var(--border)] p-3 text-xs uppercase tracking-wide">Activity</th>
+                  <th className="border-b border-[var(--border)] p-3 text-xs uppercase tracking-wide">
+                    {sortButton("energy_level", "Energy")}
+                  </th>
+                  <th className="border-b border-[var(--border)] p-3 text-xs uppercase tracking-wide">Notes</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sortedRows.slice(0, 300).map((row) => (
+                  <tr key={row.id} className="hover:bg-[var(--glow)]">
+                    <td className="border-b border-[var(--border)] p-3 font-mono text-xs text-[var(--text-secondary)]">
+                      {new Date(row.logged_at).toLocaleDateString()}
+                    </td>
+                    <td className="border-b border-[var(--border)] p-3 font-mono text-xs text-[var(--text-secondary)]">
+                      {new Date(row.logged_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                    </td>
+                    <td className="border-b border-[var(--border)] p-3 text-[var(--emotion-text,var(--text-primary))]">
+                      {row.emotion}
+                      {row.confidence != null && (
+                        <span className="ml-1 text-xs text-[var(--text-muted)]">({Math.round(row.confidence)}%)</span>
+                      )}
+                    </td>
+                    <td className="border-b border-[var(--border)] p-3 text-[var(--text-secondary)]">{row.source}</td>
+                    <td className="border-b border-[var(--border)] p-3 text-[var(--text-secondary)]">
+                      {[row.time_of_day, row.activities?.join(", ")].filter(Boolean).join(" · ") || "—"}
+                    </td>
+                    <td className="border-b border-[var(--border)] p-3 text-[var(--text-secondary)]">
+                      {row.energy_level ?? "—"}
+                    </td>
+                    <td className="border-b border-[var(--border)] p-3 text-[var(--text-secondary)]">
+                      {row.note ?? "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {sortedRows.length > 300 && (
+              <p className="mt-3 text-xs text-[var(--text-muted)]">
+                Showing 300 of {sortedRows.length}. Export CSV for the full list.
+              </p>
+            )}
+          </section>
+        </>
+      )}
 
-      <section className="mt-10 mb-10 rounded-2xl border border-[var(--border)] bg-[var(--emotion-surface,var(--bg-elevated))] p-6">
-        <h2 className="font-display text-2xl font-bold text-[var(--emotion-text,var(--text-primary))]">
-          Monthly narrative
-        </h2>
+      <section className={sectionClass}>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="font-display text-2xl font-bold text-[var(--emotion-text,var(--text-primary))]">
+            Narrative summary
+          </h2>
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => void writeNarrative()}
+            loading={narrativeLoading}
+            className="print:hidden"
+          >
+            Rewrite for these dates
+          </Button>
+        </div>
         <div className="mt-4 space-y-3 text-sm leading-relaxed text-[var(--text-secondary)]" aria-live="polite">
-          {loading ? (
-            <p className="emosense-pulse">Drafting monthly overview…</p>
+          {narrativeLoading || loading ? (
+            <p className="emosense-pulse">Drafting overview…</p>
           ) : (
             <p className="whitespace-pre-line">{narrative}</p>
           )}
         </div>
+        <p className="mt-4 text-xs text-[var(--text-muted)]">
+          This summary is a support tool, not a diagnosis.
+        </p>
       </section>
 
-      <section className="mt-10 rounded-2xl border border-[var(--border)] bg-[var(--emotion-surface,var(--bg-surface))] p-6">
-        <h2 className="font-display text-2xl font-bold text-[var(--emotion-text,var(--text-primary))]">
-          Evaluation metrics
-        </h2>
+      <details className={`${sectionClass} mb-10 print:hidden`}>
+        <summary className="cursor-pointer font-display text-xl font-bold text-[var(--emotion-text,var(--text-primary))]">
+          How we evaluate accuracy
+        </summary>
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-[var(--text-secondary)]">
-          These are the real metrics to collect before claiming clinical-grade performance.
+          These are the metrics to collect before claiming clinical-grade performance.
         </p>
         <div className="mt-5 grid gap-3 md:grid-cols-2">
           {evaluationMetrics.map((metric) => (
@@ -469,31 +493,7 @@ export default function ReportsPage() {
             </div>
           ))}
         </div>
-      </section>
-
-      <section className="mt-10 mb-10 rounded-2xl border border-[var(--border)] bg-[var(--emotion-surface,var(--bg-surface))] p-6">
-        <h2 className="font-display text-2xl font-bold text-[var(--emotion-text,var(--text-primary))]">
-          Bigger upgrade roadmap
-        </h2>
-        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-[var(--text-secondary)]">
-          These upgrades are high value, but they need more design, privacy review, testing, and backend work before implementation.
-        </p>
-        <div className="mt-5 grid gap-4 md:grid-cols-2">
-          {futureUpgradeRoadmap.map((item) => (
-            <article
-              key={item.title}
-              className="rounded-xl border border-[var(--border)] bg-[var(--bg-base)] p-4"
-            >
-              <h3 className="font-body text-sm font-semibold text-[var(--emotion-text,var(--text-primary))]">
-                {item.title}
-              </h3>
-              <p className="mt-2 text-sm leading-relaxed text-[var(--text-secondary)]">
-                {item.detail}
-              </p>
-            </article>
-          ))}
-        </div>
-      </section>
+      </details>
     </div>
   );
 }
