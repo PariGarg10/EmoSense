@@ -12,10 +12,12 @@ type HelpbotMessage = {
 };
 
 const starterPrompts = [
+  "How do I know if someone is sarcastic?",
+  "How do I calm down when my heart races?",
+  "What does loneliness feel like in the body?",
+  "How is anger different from disgust?",
   "I feel overwhelmed by noise.",
-  "I am angry and need a calm step.",
   "I do not know what emotion this is.",
-  "Help me explain my feeling to a caregiver.",
 ];
 
 const initialMessages: HelpbotMessage[] = [
@@ -23,7 +25,7 @@ const initialMessages: HelpbotMessage[] = [
     id: "welcome",
     role: "assistant",
     content:
-      "Hi, I am EmoSense Helpbot. Tell me what happened or how your body feels, and I can help name the emotion and choose one small next step.",
+      "Hi, I am EmoSense Helpbot. Ask me about emotions: what they mean, how they feel in your body, how to calm down, meltdowns and sensory overload, or social situations like sarcasm and teasing. You can also just tell me what happened.",
   },
 ];
 
@@ -106,7 +108,7 @@ export default function HelpbotPage() {
           Helpbot
         </h1>
         <p className="mt-3 max-w-3xl text-[var(--text-secondary)]">
-          Ask for help naming a feeling, choosing a coping step, or explaining a situation to a caregiver.
+          Ask about feelings, body signs, calming steps, or social situations like sarcasm. Plain answers, one step at a time.
         </p>
       </header>
 
@@ -135,7 +137,7 @@ export default function HelpbotPage() {
                 className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
               >
                 <div
-                  className={`max-w-[82%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
+                  className={`max-w-[82%] whitespace-pre-line rounded-2xl px-4 py-3 text-sm leading-relaxed ${
                     message.role === "user"
                       ? "bg-[var(--emotion-accent,var(--accent-primary))] text-white"
                       : "border border-[var(--border)] bg-[var(--bg-base)] text-[var(--text-secondary)]"
