@@ -9,7 +9,6 @@ import {
   Camera,
   ChartLine,
   ChatCircleText,
-  ClipboardText,
   Microphone,
   NotePencil,
   Trash,
@@ -52,7 +51,6 @@ const QUICK_ACTIONS = [
   { href: "/behaviour-tracker", label: "Mood tracker", icon: ChartLine },
   { href: "/helpbot", label: "Helpbot", icon: ChatCircleText },
   { href: "/emotion-dictionary", label: "Dictionary", icon: BookOpen },
-  { href: "/reports", label: "Reports", icon: ClipboardText },
 ] as const;
 
 function FlameIcon() {
@@ -423,7 +421,7 @@ export default function DashboardPage() {
         <h2 id="quick-heading" className="mb-4 font-display text-xl font-bold">
           Quick actions
         </h2>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
           {QUICK_ACTIONS.map(({ href, label, icon: Icon }) => (
             <Link
               key={href}

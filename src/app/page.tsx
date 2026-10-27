@@ -231,7 +231,7 @@ export default function LandingPage() {
                 ].map(([value, label]) => (
                     <Link
                     key={label}
-                      href={label === "emotions" ? "/emotion-dictionary" : label === "care views" ? "/reports" : "/login"}
+                      href={label === "emotions" ? "/emotion-dictionary" : "/login"}
                     className="rounded-2xl border border-white/10 bg-white/[0.07] p-4 backdrop-blur-xl"
                   >
                     <dt className="font-display text-3xl font-bold text-white">

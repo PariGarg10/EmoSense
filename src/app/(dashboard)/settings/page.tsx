@@ -8,7 +8,6 @@ import type {
   FontSizePreset,
   MotionPreset,
   ThemePreset,
-  UserRole,
 } from "@/lib/types";
 import { signOut } from "@/src/lib/authGate";
 import { deleteAllLogs, exportLogs } from "@/src/lib/logRepository";
@@ -37,17 +36,10 @@ const crisisLinks = [
   { label: "Find a helpline in another country", href: "https://findahelpline.com/" },
 ];
 
-const ROLE_OPTIONS: { value: UserRole; label: string; detail: string }[] = [
-  { value: "user", label: "Me", detail: "I am tracking my own feelings." },
-  { value: "caregiver", label: "Caregiver", detail: "I support someone and log with them." },
-  { value: "therapist", label: "Therapist", detail: "Reports use clinical-style language." },
-];
-
 export default function SettingsPage() {
   const user = useEmoSenseStore((s) => s.user);
   const setUser = useEmoSenseStore((s) => s.setUser);
   const role = useEmoSenseStore((s) => s.userRole);
-  const setUserRole = useEmoSenseStore((s) => s.setUserRole);
   const sensory = useEmoSenseStore((s) => s.sensory);
   const setSensory = useEmoSenseStore((s) => s.setSensory);
   const addToast = useEmoSenseStore((s) => s.addToast);
@@ -219,35 +211,6 @@ export default function SettingsPage() {
               disabled={authKind === "demo"}
             />
           </label>
-          <fieldset>
-            <legend className="text-sm text-[var(--text-secondary)]">I am using EmoSense as</legend>
-            <div className="mt-3 grid gap-2 sm:grid-cols-3">
-              {ROLE_OPTIONS.map((opt) => (
-                <label
-                  key={opt.value}
-                  className={[
-                    "flex cursor-pointer flex-col rounded-xl border p-3 text-sm",
-                    role === opt.value
-                      ? "border-[var(--emotion-accent,var(--accent-primary))] bg-[var(--glow)]"
-                      : "border-[var(--border)]",
-                  ].join(" ")}
-                >
-                  <span className="flex items-center gap-2 font-medium text-[var(--text-primary)]">
-                    <input
-                      type="radio"
-                      name="role"
-                      value={opt.value}
-                      checked={role === opt.value}
-                      onChange={() => setUserRole(opt.value)}
-                      className="accent-[var(--accent-primary)]"
-                    />
-                    {opt.label}
-                  </span>
-                  <span className="mt-1 text-xs text-[var(--text-muted)]">{opt.detail}</span>
-                </label>
-              ))}
-            </div>
-          </fieldset>
           <Button type="submit" loading={savingProfile}>
             Save profile
           </Button>

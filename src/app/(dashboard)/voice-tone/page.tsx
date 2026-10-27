@@ -240,7 +240,7 @@ export default function VoiceTonePage() {
               Consent-based microphone check
             </h2>
             <p className="mt-2 text-sm leading-relaxed text-[var(--text-secondary)]">
-              Audio is analysed in the browser for {ANALYSIS_SECONDS} seconds. Raw audio is not saved, uploaded, or added to reports in this MVP.
+              Audio is analysed in the browser for {ANALYSIS_SECONDS} seconds. Raw audio is not saved or uploaded.
             </p>
           </div>
         </div>

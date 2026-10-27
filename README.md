@@ -11,13 +11,12 @@ EmoSense is an autism-friendly emotion support app for reading, tracking, and ex
 - Model confidence scores and emotion distribution chart after scans.
 - Consent-based voice tone analysis using a short local microphone check.
 - Facial, voice, and text emotion fusion with explainable weighting.
-- Helpbot support chat for naming feelings, choosing coping steps, and explaining situations.
+- Helpbot support chat that answers the question asked: what a feeling means, how it feels in the body, calming steps for body symptoms, meltdowns and sensory overload, and social cues such as sarcasm, teasing and body language.
 - AI-generated plain-language emotion explanations.
 - Safety note that scan results are prompts, not diagnoses.
 - Mood and behaviour tracker with emotion, time of day, activity, energy, and notes.
 - Emotion dictionary with definitions, body signals, scenarios, and coping strategies.
-- Reports for every role built from real logs: summary stats, emotion frequency, longitudinal trends, sortable log table, AI narrative, date-range filter, CSV export, and print/PDF.
-- Settings for profile and role, password change, sign-out, theme (dark/light/high-contrast light), font size, contrast, motion, daily reminders, full data export, and delete.
+- Settings for profile, password change, sign-out, theme (dark/light/high-contrast light), font size, contrast, motion, daily reminders, full data export, and delete.
 - Social stories with step-by-step scenes, category filter, and read-aloud.
 
 ## Tech Stack
@@ -31,8 +30,8 @@ EmoSense is an autism-friendly emotion support app for reading, tracking, and ex
 - `face-api.js` and TensorFlow.js for facial emotion detection
 - Browser Web Audio API for local voice signal analysis
 - Lightweight rule-based text sentiment and signal fusion scoring
-- Recharts for reports and trends
-- jsPDF / browser print flow for exporting reports
+- Recharts for the face-scan expression chart
+- jsPDF for downloading weekly insights
 - Phosphor Icons, React Dropzone, clsx
 
 ## Data And Integrations
@@ -41,9 +40,9 @@ EmoSense is an autism-friendly emotion support app for reading, tracking, and ex
 - Device-only account passwords are stored as salted PBKDF2-SHA256 hashes (older plaintext entries are upgraded on next sign-in).
 - The active session is kept in localStorage ("keep me signed in") or sessionStorage (this tab only).
 - Local face model files in `public/models`, with CDN fallback. The Supabase SDK is only downloaded for cloud accounts.
-- Voice tone analysis runs locally in the browser; raw audio is not saved, uploaded, transcribed, or added to reports in the MVP.
+- Voice tone analysis runs locally in the browser; raw audio is not saved, uploaded, or transcribed.
 - Emotion fusion prefills from your latest face scan and voice check; you can save the fused result to your log.
-- Helpbot, scan explanations, weekly insights, and report narratives use Claude (`claude-opus-5-5`, see `src/lib/claude.ts`) when `ANTHROPIC_API_KEY` is set, and deterministic local text when it is not or a request fails.
+- Helpbot, scan explanations, and weekly insights use Claude (`claude-opus-5-5`, see `src/lib/claude.ts`) when `ANTHROPIC_API_KEY` is set, and deterministic local text when it is not or a request fails.
 - No payment integration is currently included.
 
 ## Implemented Upgrade Details
@@ -78,9 +77,9 @@ EmoSense is an autism-friendly emotion support app for reading, tracking, and ex
 - API route: `POST /api/helpbot`
 - Files: `src/app/(dashboard)/helpbot/page.tsx`, `app/(dashboard)/helpbot/page.tsx`, `src/app/api/helpbot/route.ts`, `app/api/helpbot/route.ts`
 - Navigation: added to shared dashboard navigation through `src/components/layout/navItems.ts`
-- Purpose: help users name feelings, choose one small coping step, or explain a situation to a caregiver
+- Purpose: answer questions about feelings, body signs, calming steps and social situations, or help explain a situation to a caregiver
 - UX: chat interface, quick-start prompts, loading state, inline error handling, and safety panel
-- AI behavior: uses Anthropic Claude when configured; otherwise returns deterministic local fallback guidance
+- AI behavior: `src/lib/helpbotKnowledge.ts` classifies the question (social cue, body symptom, a specific emotion, a comparison, coping, app help) and answers it from the emotion dictionary. With `ANTHROPIC_API_KEY` set, Claude writes the reply using that answer as reference notes; without it, the local answer is returned.
 - Safety model: crisis-language detection returns immediate safety guidance, Helpbot is labeled as supportive rather than therapeutic, and it avoids diagnosis, prescribing, or risk decisions
 - Privacy model: only the short message history needed for a reply is sent to the API; messages are not persisted by this MVP
 
@@ -91,8 +90,6 @@ Already added as lightweight improvements:
 - Model confidence scores for face scans.
 - Explainability text showing that scan results come from ranked expression scores.
 - AI safety wording that results are not diagnostic.
-- Longitudinal trend section in reports.
-- Real evaluation metrics section for future validation.
 - Voice tone analysis MVP with local-only microphone processing.
 - Facial, voice, and text emotion fusion MVP with explainable weighted scoring.
 - Helpbot support chat with Anthropic-backed replies, local fallback, and crisis-language safety handling.
