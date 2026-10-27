@@ -16,6 +16,7 @@ EmoSense is an autism-friendly emotion support app for reading, tracking, and ex
 - Safety note that scan results are prompts, not diagnoses.
 - Mood and behaviour tracker with emotion, time of day, activity, energy, and notes.
 - Emotion dictionary with definitions, body signals, scenarios, and coping strategies.
+- Reports open to every signed-in user, built from their own logs: summary stats, emotion frequency, longitudinal trends, sortable log table, AI narrative, date-range filter, CSV export, and print/PDF.
 - Settings for profile, password change, sign-out, theme (dark/light/high-contrast light), font size, contrast, motion, daily reminders, full data export, and delete.
 - Social stories with step-by-step scenes, category filter, and read-aloud.
 
@@ -30,7 +31,7 @@ EmoSense is an autism-friendly emotion support app for reading, tracking, and ex
 - `face-api.js` and TensorFlow.js for facial emotion detection
 - Browser Web Audio API for local voice signal analysis
 - Lightweight rule-based text sentiment and signal fusion scoring
-- Recharts for the face-scan expression chart
+- Recharts for reports and the face-scan expression chart
 - jsPDF for downloading weekly insights
 - Phosphor Icons, React Dropzone, clsx
 
@@ -42,7 +43,7 @@ EmoSense is an autism-friendly emotion support app for reading, tracking, and ex
 - Local face model files in `public/models`, with CDN fallback. The Supabase SDK is only downloaded for cloud accounts.
 - Voice tone analysis runs locally in the browser; raw audio is not saved, uploaded, or transcribed.
 - Emotion fusion prefills from your latest face scan and voice check; you can save the fused result to your log.
-- Helpbot, scan explanations, and weekly insights use Claude (`claude-opus-5-5`, see `src/lib/claude.ts`) when `ANTHROPIC_API_KEY` is set, and deterministic local text when it is not or a request fails.
+- Helpbot, scan explanations, weekly insights, and report narratives use Claude (`claude-opus-5-5`, see `src/lib/claude.ts`) when `ANTHROPIC_API_KEY` is set, and deterministic local text when it is not or a request fails.
 - No payment integration is currently included.
 
 ## Implemented Upgrade Details

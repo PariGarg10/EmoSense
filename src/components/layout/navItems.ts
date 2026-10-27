@@ -3,6 +3,7 @@ import {
   BookOpen,
   Brain,
   Camera,
+  ClipboardText,
   ChartLine,
   ChatCircleText,
   Gear,
@@ -61,6 +62,12 @@ export const NAV_ITEMS: NavItem[] = [
     label: "Social stories",
     shortLabel: "Stories",
     icon: UsersThree,
+  },
+  {
+    href: "/reports",
+    label: "Reports",
+    shortLabel: "Reports",
+    icon: ClipboardText,
   },
   { href: "/settings", label: "Settings", shortLabel: "Settings", icon: Gear },
 ];

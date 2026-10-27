@@ -122,3 +122,33 @@ export async function generateWeeklyInsights(logs: unknown): Promise<string> {
   });
   return text ?? localInsights(clean);
 }
+
+export async function generateMonthlyReport(
+  logs: unknown,
+  role: "user" | "caregiver" | "therapist",
+): Promise<string> {
+  const clean = sanitizeLogs(logs);
+  if (clean.length === 0) {
+    return "Overview: No logs in this date range yet.\n\nPatterns: Save check-ins, face scans, or mood entries to build a report.\n\nRecommendations: Aim for one short entry a day so trends become visible.";
+  }
+
+  const audience =
+    role === "therapist"
+      ? "a therapist; use objective, clinical-style language"
+      : role === "caregiver"
+        ? "a caregiver; use plain, supportive language"
+        : "the person who logged these entries; use plain, kind, second-person language";
+
+  const text = await askClaude({
+    system: `Write a monthly emotion summary for ${audience}. Note patterns, possible triggers, and positive trends. Do not diagnose. Format: an 'Overview:' paragraph, then 'Patterns:' and 'Recommendations:' sections. Keep it under 250 words.`,
+    messages: [{ role: "user", content: `Logs (JSON): ${JSON.stringify(clean)}` }],
+    maxTokens: 3000,
+  });
+
+  if (text) return text;
+  const bullets = localInsights(clean)
+    .split("\n")
+    .map((l) => l.replace(/^•\s*/, "- "))
+    .join("\n");
+  return `Overview: ${clean.length} entries in this range.\n\nPatterns:\n${bullets}\n\nRecommendations: Keep short daily notes and review trends weekly with your care team.`;
+}
