@@ -1,40 +1,49 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import clsx from "clsx";
 import Button from "@/components/ui/Button";
-import { canAccessDashboard, goToDashboard, markSignedIn } from "@/src/lib/authGate";
+import { completeSignIn, resolveSession, safeNextPath, sessionFromSupabaseUser } from "@/src/lib/authGate";
 import {
-  clearBrowserAuth,
   DEMO_EMAIL,
   DEMO_PASSWORD,
+  MIN_PASSWORD_LENGTH,
   demoUser,
+  hasLocalAccount,
   registerLocalAccount,
-  setDemoSession,
-  setLocalSession,
-  setSupabaseSessionActive,
   tryDemoLogin,
+  validateEmail,
+  validatePassword,
   verifyLocalLogin,
-  type AuthKind,
 } from "@/src/lib/sessionAuth";
+import { isSupabaseConfigured, loadSupabase } from "@/src/lib/supabaseEnv";
 import { useEmoSenseStore } from "@/lib/store";
 
-type AuthMode = "signin" | "signup";
+type AuthMode = "signin" | "signup" | "forgot";
+
+const MAX_ATTEMPTS = 5;
+const LOCKOUT_MS = 30_000;
 
 function formatAuthError(message: string): string {
   const lower = message.toLowerCase();
   if (lower.includes("invalid login credentials") || lower.includes("invalid credentials")) {
     return "Email or password is incorrect. Try again or sign up first.";
   }
+  if (lower.includes("email not confirmed")) {
+    return "Please confirm your email first. Check your inbox for the link.";
+  }
   if (lower.includes("already registered") || lower.includes("already been registered")) {
     return "This email already has an account. Use Sign in instead.";
   }
   if (lower.includes("password") && lower.includes("least")) {
-    return "Password must be at least 6 characters.";
+    return `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`;
   }
   if (lower.includes("rate limit") || lower.includes("too many")) {
     return "Too many attempts. Please wait a few minutes and try again.";
+  }
+  if (lower.includes("fetch") || lower.includes("network")) {
+    return "Could not reach the server. Check your connection and try again.";
   }
   return message;
 }
@@ -42,221 +51,201 @@ function formatAuthError(message: string): string {
 const inputClass =
   "mt-2 min-h-[48px] w-full rounded-lg border border-neutral-300 bg-white px-4 text-base text-black placeholder:text-neutral-500";
 
-const passwordInputClass =
-  "mt-2 min-h-[48px] w-full rounded-lg border border-neutral-300 bg-white px-4 text-base text-black placeholder:text-neutral-500";
+function nextPath(): string {
+  if (typeof window === "undefined") return "/dashboard";
+  return safeNextPath(new URLSearchParams(window.location.search).get("next"));
+}
 
 export default function LoginPage() {
   const addToast = useEmoSenseStore((s) => s.addToast);
-  const setUser = useEmoSenseStore((s) => s.setUser);
-  const setUserRole = useEmoSenseStore((s) => s.setUserRole);
 
+  const [cloudEnabled, setCloudEnabled] = useState(false);
   const [mode, setMode] = useState<AuthMode>("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [displayName, setDisplayName] = useState("");
   const [localOnlyAccount, setLocalOnlyAccount] = useState(true);
+  const [remember, setRemember] = useState(true);
   const [loading, setLoading] = useState(false);
   const [inlineError, setInlineError] = useState<string | null>(null);
-  const [signupDone, setSignupDone] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const failures = useRef<{ count: number; until: number }>({ count: 0, until: 0 });
 
   useEffect(() => {
-    if (canAccessDashboard()) {
-      goToDashboard();
-    }
+    const cloud = isSupabaseConfigured();
+    setCloudEnabled(cloud);
+    setLocalOnlyAccount(!cloud);
+    void resolveSession().then((session) => {
+      if (session) window.location.replace(nextPath());
+    });
   }, []);
 
   function switchMode(next: AuthMode) {
     setMode(next);
     setInlineError(null);
-    setSignupDone(false);
+    setNotice(null);
     setPassword("");
   }
 
-  function finishSignIn(
-    user: { id: string; email?: string; displayName?: string },
-    authKind: AuthKind,
-    role: "user" | "caregiver" | "therapist" = "user",
-  ) {
-    markSignedIn(authKind);
-    setUser({
-      id: user.id,
-      email: user.email,
-      displayName: user.displayName,
-    });
-    setUserRole(role);
+  function fail(message: string) {
     setLoading(false);
+    setInlineError(message);
+  }
+
+  function finish(session: Parameters<typeof completeSignIn>[0]) {
+    failures.current = { count: 0, until: 0 };
+    completeSignIn(session, { remember });
     addToast({ variant: "success", message: "Opening your dashboard..." });
-    goToDashboard();
+    window.location.replace(nextPath());
+  }
+
+  function lockedOut(): boolean {
+    const f = failures.current;
+    if (f.until > Date.now()) {
+      const secs = Math.ceil((f.until - Date.now()) / 1000);
+      setInlineError(`Too many attempts. Try again in ${secs} seconds.`);
+      return true;
+    }
+    return false;
+  }
+
+  function recordFailure() {
+    const f = failures.current;
+    f.count += 1;
+    if (f.count >= MAX_ATTEMPTS) {
+      f.until = Date.now() + LOCKOUT_MS;
+      f.count = 0;
+    }
   }
 
   function enterDemo() {
     setInlineError(null);
-    clearBrowserAuth();
-    setDemoSession();
-    finishSignIn(demoUser(), "demo");
+    finish(demoUser());
   }
 
   async function handleSignIn(e: FormEvent) {
     e.preventDefault();
     setInlineError(null);
+    setNotice(null);
+    if (lockedOut()) return;
 
     if (tryDemoLogin(email, password)) {
-      setDemoSession();
-      finishSignIn(demoUser(), "demo");
-      return;
-    }
-
-    const localAcc = verifyLocalLogin(email, password);
-    if (localAcc) {
-      setLocalSession({
-        kind: "local",
-        id: localAcc.id,
-        email: localAcc.email,
-        displayName: localAcc.displayName,
-      });
-      finishSignIn(
-        {
-          id: localAcc.id,
-          email: localAcc.email,
-          displayName: localAcc.displayName,
-        },
-        "local",
-      );
+      finish(demoUser());
       return;
     }
 
     setLoading(true);
-    const { createClient } = await import("@/src/lib/supabase");
-    const supabase = createClient();
+    if (hasLocalAccount(email)) {
+      const local = await verifyLocalLogin(email, password);
+      if (local) {
+        finish(local);
+        return;
+      }
+      if (!cloudEnabled) {
+        recordFailure();
+        fail("Email or password is incorrect.");
+        return;
+      }
+    }
+
+    const supabase = await loadSupabase();
     if (!supabase) {
-      setLoading(false);
-      setInlineError(
-        "Unknown email/password. Use demo, Sign up (this device), or add Supabase keys on Vercel.",
-      );
-      addToast({ variant: "error", message: "Sign-in failed." });
+      recordFailure();
+      fail("No account found with that email on this device. Sign up, or use the demo account.");
       return;
     }
 
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
-      password,
-    });
-
-    if (error) {
-      setLoading(false);
-      const friendly = formatAuthError(error.message);
-      setInlineError(friendly);
-      addToast({ variant: "error", message: friendly });
-      return;
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
+      if (error || !data.user) {
+        recordFailure();
+        fail(formatAuthError(error?.message ?? "Could not sign in. Please try again."));
+        return;
+      }
+      finish(sessionFromSupabaseUser(data.user));
+    } catch (err) {
+      fail(formatAuthError(err instanceof Error ? err.message : "Network error"));
     }
-
-    if (!data.user) {
-      setLoading(false);
-      setInlineError("Could not sign in. Please try again.");
-      return;
-    }
-
-    setSupabaseSessionActive();
-    markSignedIn("supabase");
-    const metaName =
-      typeof data.user.user_metadata?.display_name === "string"
-        ? data.user.user_metadata.display_name
-        : undefined;
-    finishSignIn(
-      {
-        id: data.user.id,
-        email: data.user.email,
-        displayName: metaName ?? data.user.email?.split("@")[0],
-      },
-      "supabase",
-    );
   }
 
   async function handleSignUp(e: FormEvent) {
     e.preventDefault();
     setInlineError(null);
-    setSignupDone(false);
+    setNotice(null);
 
-    if (password.length < 6) {
-      setInlineError("Password must be at least 6 characters.");
-      return;
-    }
-
-    if (localOnlyAccount) {
-      const result = registerLocalAccount(email, password, displayName);
-      if (!result.ok) {
-        setInlineError(result.error);
-        addToast({ variant: "error", message: result.error });
-        return;
-      }
-      const acc = verifyLocalLogin(email, password);
-      if (acc) {
-        setLocalSession({
-          kind: "local",
-          id: acc.id,
-          email: acc.email,
-          displayName: acc.displayName,
-        });
-        finishSignIn(
-          {
-            id: acc.id,
-            email: acc.email,
-            displayName: acc.displayName,
-          },
-          "local",
-        );
-      }
-      return;
-    }
+    const emailError = validateEmail(email);
+    if (emailError) return fail(emailError);
+    const passwordError = validatePassword(password);
+    if (passwordError) return fail(passwordError);
 
     setLoading(true);
-    const { createClient } = await import("@/src/lib/supabase");
-    const supabase = createClient();
+    if (localOnlyAccount) {
+      const result = await registerLocalAccount(email, password, displayName);
+      if (!result.ok) return fail(result.error);
+      finish(result.session);
+      return;
+    }
+
+    const supabase = await loadSupabase();
     if (!supabase) {
-      setLoading(false);
-      setInlineError("Cloud sign-up needs Supabase keys—or leave “Save on this device only” checked.");
-      addToast({ variant: "error", message: "Sign-up is not configured." });
-      return;
+      return fail("Cloud sign-up is not configured. Keep “Save on this device only” checked.");
     }
 
-    const { data, error } = await supabase.auth.signUp({
-      email: email.trim(),
-      password,
-      options: {
-        data: { display_name: displayName.trim() || undefined },
-      },
-    });
-
-    if (error) {
-      setLoading(false);
-      const friendly = formatAuthError(error.message);
-      setInlineError(friendly);
-      addToast({ variant: "error", message: friendly });
-      return;
-    }
-
-    if (data.session && data.user) {
-      setSupabaseSessionActive();
-      finishSignIn(
-        {
-          id: data.user.id,
-          email: data.user.email,
-          displayName: displayName.trim() || data.user.email?.split("@")[0],
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email: email.trim(),
+        password,
+        options: {
+          data: { display_name: displayName.trim() || undefined },
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
         },
-        "supabase",
-      );
-      return;
-    }
+      });
+      if (error) return fail(formatAuthError(error.message));
 
-    setLoading(false);
-    setSignupDone(true);
-    setMode("signin");
-    setPassword("");
-    addToast({
-      variant: "success",
-      message: "Account created. Sign in with your email and password (or use device-only sign up).",
-    });
+      if (data.session && data.user) {
+        finish({
+          ...sessionFromSupabaseUser(data.user),
+          displayName: displayName.trim() || sessionFromSupabaseUser(data.user).displayName,
+        });
+        return;
+      }
+
+      setLoading(false);
+      setMode("signin");
+      setPassword("");
+      setNotice("Account created. Check your email for a confirmation link, then sign in.");
+    } catch (err) {
+      fail(formatAuthError(err instanceof Error ? err.message : "Network error"));
+    }
   }
+
+  async function handleForgot(e: FormEvent) {
+    e.preventDefault();
+    setInlineError(null);
+    setNotice(null);
+    const emailError = validateEmail(email);
+    if (emailError) return fail(emailError);
+
+    const supabase = await loadSupabase();
+    if (!supabase) {
+      return fail(
+        "Password reset needs a cloud account. Device-only accounts cannot be recovered. You can create a new one.",
+      );
+    }
+    setLoading(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: `${window.location.origin}/auth/reset`,
+    });
+    setLoading(false);
+    if (error) return fail(formatAuthError(error.message));
+    setNotice("If that email has an account, a reset link is on its way.");
+  }
+
+  const onSubmit = mode === "signin" ? handleSignIn : mode === "signup" ? handleSignUp : handleForgot;
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-[var(--bg-base)] px-4 py-10">
@@ -264,7 +253,7 @@ export default function LoginPage() {
         <p className="font-display text-2xl font-bold text-[var(--accent-primary)]">EmoSense</p>
 
         <div className="mt-4 rounded-lg border border-[var(--border)] bg-[var(--bg-base)] p-3 text-sm text-[var(--text-secondary)]">
-          <p className="font-medium text-[var(--text-primary)]">Demo login</p>
+          <p className="font-medium text-[var(--text-primary)]">Just looking around?</p>
           <p className="mt-1 font-mono text-xs text-[var(--text-muted)]">
             Email: {DEMO_EMAIL}
             <br />
@@ -275,56 +264,52 @@ export default function LoginPage() {
           </Button>
         </div>
 
-        <div className="mt-6 flex rounded-lg border border-[var(--border)] bg-[var(--bg-base)] p-1">
-          <button
-            type="button"
-            onClick={() => switchMode("signin")}
-            className={clsx(
-              "min-h-[44px] flex-1 rounded-md text-sm font-medium transition-colors",
-              mode === "signin"
-                ? "bg-[var(--accent-primary)] text-white"
-                : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]",
-            )}
-          >
-            Sign in
-          </button>
-          <button
-            type="button"
-            onClick={() => switchMode("signup")}
-            className={clsx(
-              "min-h-[44px] flex-1 rounded-md text-sm font-medium transition-colors",
-              mode === "signup"
-                ? "bg-[var(--accent-primary)] text-white"
-                : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]",
-            )}
-          >
-            Sign up
-          </button>
-        </div>
+        {mode !== "forgot" && (
+          <div className="mt-6 flex rounded-lg border border-[var(--border)] bg-[var(--bg-base)] p-1" role="tablist">
+            {(["signin", "signup"] as const).map((m) => (
+              <button
+                key={m}
+                type="button"
+                role="tab"
+                aria-selected={mode === m}
+                onClick={() => switchMode(m)}
+                className={clsx(
+                  "min-h-[44px] flex-1 rounded-md text-sm font-medium transition-colors",
+                  mode === m
+                    ? "bg-[var(--accent-primary)] text-white"
+                    : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]",
+                )}
+              >
+                {m === "signin" ? "Sign in" : "Sign up"}
+              </button>
+            ))}
+          </div>
+        )}
 
         <h1 className="mt-6 font-display text-2xl font-bold text-[var(--text-primary)]">
-          {mode === "signin" ? "Welcome back" : "Create your account"}
+          {mode === "signin" ? "Welcome back" : mode === "signup" ? "Create your account" : "Reset password"}
         </h1>
         <p className="mt-2 text-sm text-[var(--text-secondary)]">
           {mode === "signin"
-            ? "Sign in with demo, a device-saved account, or Supabase."
-            : "Default: account on this device only—no email."}
+            ? "Sign in with a device account or your cloud account."
+            : mode === "signup"
+              ? cloudEnabled
+                ? "A cloud account keeps your logs safe across devices."
+                : "Your account and logs are saved in this browser."
+              : "We will email you a link to choose a new password."}
         </p>
 
-        {signupDone && mode === "signin" && (
+        {notice && (
           <p
             className="mt-4 rounded-lg border border-[var(--accent-soft)]/40 bg-[rgba(126,200,164,0.12)] px-3 py-2 text-sm text-[var(--accent-soft)]"
             role="status"
           >
-            If you used cloud sign-up, confirm your email. Or use “Save on this device only” next time.
+            {notice}
           </p>
         )}
 
-        <form
-          className="mt-6 space-y-4"
-          onSubmit={mode === "signin" ? handleSignIn : handleSignUp}
-        >
-          {mode === "signup" && (
+        <form className="mt-6 space-y-4" onSubmit={onSubmit} noValidate>
+          {mode === "signup" && cloudEnabled && (
             <label className="flex cursor-pointer items-start gap-3 text-sm text-[var(--text-secondary)]">
               <input
                 type="checkbox"
@@ -335,7 +320,7 @@ export default function LoginPage() {
               <span>
                 <span className="font-medium text-[var(--text-primary)]">Save on this device only</span>
                 <span className="block text-xs text-[var(--text-muted)]">
-                  No confirmation email. Stays in this browser only.
+                  No email needed. Data stays in this browser and cannot be recovered if cleared.
                 </span>
               </span>
             </label>
@@ -351,6 +336,7 @@ export default function LoginPage() {
                 onChange={(e) => setDisplayName(e.target.value)}
                 className={inputClass}
                 placeholder="Your name"
+                maxLength={60}
               />
             </label>
           )}
@@ -368,19 +354,59 @@ export default function LoginPage() {
             />
           </label>
 
-          <label className="block text-sm text-[var(--text-secondary)]">
-            Password
-            <input
-              type="password"
-              required
-              minLength={6}
-              autoComplete={mode === "signin" ? "current-password" : "new-password"}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className={passwordInputClass}
-              placeholder={mode === "signup" ? "At least 6 characters" : "Your password"}
-            />
-          </label>
+          {mode !== "forgot" && (
+            <div className="text-sm text-[var(--text-secondary)]">
+              <label htmlFor="login-password">Password</label>
+              <div className="relative">
+                <input
+                  id="login-password"
+                  type={showPassword ? "text" : "password"}
+                  required
+                  autoComplete={mode === "signin" ? "current-password" : "new-password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className={clsx(inputClass, "pr-20")}
+                  placeholder={
+                    mode === "signup"
+                      ? `${MIN_PASSWORD_LENGTH}+ characters, a letter and a number`
+                      : "Your password"
+                  }
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="absolute right-2 top-1/2 mt-1 min-h-[36px] -translate-y-1/2 rounded px-2 text-xs font-medium text-neutral-600 hover:text-black"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  aria-pressed={showPassword}
+                >
+                  {showPassword ? "Hide" : "Show"}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {mode !== "forgot" && (
+            <div className="flex items-center justify-between gap-3">
+              <label className="flex cursor-pointer items-center gap-2 text-sm text-[var(--text-secondary)]">
+                <input
+                  type="checkbox"
+                  checked={remember}
+                  onChange={(e) => setRemember(e.target.checked)}
+                  className="h-4 w-4 accent-[var(--accent-primary)]"
+                />
+                Keep me signed in
+              </label>
+              {mode === "signin" && (
+                <button
+                  type="button"
+                  className="text-sm text-[var(--accent-primary)] underline-offset-4 hover:underline"
+                  onClick={() => switchMode("forgot")}
+                >
+                  Forgot password?
+                </button>
+              )}
+            </div>
+          )}
 
           {inlineError && (
             <p
@@ -392,16 +418,26 @@ export default function LoginPage() {
           )}
 
           <Button type="submit" variant="primary" loading={loading} className="w-full">
-            {mode === "signin" ? "Sign in" : "Create account"}
+            {mode === "signin" ? "Sign in" : mode === "signup" ? "Create account" : "Send reset link"}
           </Button>
         </form>
 
-        <Link
-          href="/"
-          className="mt-6 inline-flex min-h-[44px] items-center text-sm text-[var(--text-muted)] underline-offset-4 hover:underline"
-        >
-          Back to home
-        </Link>
+        {mode === "forgot" ? (
+          <button
+            type="button"
+            onClick={() => switchMode("signin")}
+            className="mt-6 inline-flex min-h-[44px] items-center text-sm text-[var(--text-muted)] underline-offset-4 hover:underline"
+          >
+            Back to sign in
+          </button>
+        ) : (
+          <Link
+            href="/"
+            className="mt-6 inline-flex min-h-[44px] items-center text-sm text-[var(--text-muted)] underline-offset-4 hover:underline"
+          >
+            Back to home
+          </Link>
+        )}
       </div>
     </main>
   );

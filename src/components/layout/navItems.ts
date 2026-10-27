@@ -1,6 +1,7 @@
 import type { Icon } from "@phosphor-icons/react";
 import {
   BookOpen,
+  Brain,
   Camera,
   ChartLine,
   ChatCircleText,
@@ -8,6 +9,7 @@ import {
   Gear,
   House,
   Microphone,
+  UsersThree,
 } from "@phosphor-icons/react";
 
 export type NavItem = {
@@ -35,7 +37,7 @@ export const NAV_ITEMS: NavItem[] = [
     href: "/emotion-fusion",
     label: "Fusion",
     shortLabel: "Fusion",
-    icon: ChartLine,
+    icon: Brain,
   },
   {
     href: "/helpbot",
@@ -54,6 +56,12 @@ export const NAV_ITEMS: NavItem[] = [
     label: "Dictionary",
     shortLabel: "Dict",
     icon: BookOpen,
+  },
+  {
+    href: "/social-stories",
+    label: "Social stories",
+    shortLabel: "Stories",
+    icon: UsersThree,
   },
   {
     href: "/reports",

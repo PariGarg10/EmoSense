@@ -211,9 +211,19 @@ export const EMOTION_THEMES: Record<
   },
 };
 
+const BY_LABEL: Record<string, string> = Object.fromEntries(
+  Object.entries(EMOTION_THEMES).map(([key, theme]) => [theme.label.toLowerCase(), key]),
+);
+
+/** Accepts a theme key ("fear") or a stored label ("Scared"). */
+function lookupTheme(emotion: string) {
+  const k = emotion.trim().toLowerCase();
+  return EMOTION_THEMES[k] ?? EMOTION_THEMES[BY_LABEL[k] ?? ""];
+}
+
 export function applyEmotionTheme(emotion: string) {
   if (typeof document === "undefined") return;
-  const theme = EMOTION_THEMES[emotion.toLowerCase()];
+  const theme = lookupTheme(emotion);
   if (!theme) return;
   document.body.setAttribute("data-emotion", theme.dataAttr);
 }
@@ -224,7 +234,5 @@ export function clearEmotionTheme() {
 }
 
 export function getTheme(emotion: string) {
-  return (
-    EMOTION_THEMES[emotion.toLowerCase()] ?? EMOTION_THEMES["neutral"]
-  );
+  return lookupTheme(emotion ?? "") ?? EMOTION_THEMES["neutral"];
 }

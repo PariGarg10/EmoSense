@@ -1,9 +1,15 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
 import { Brain, ShieldCheck } from "@phosphor-icons/react";
 import Button from "@/src/components/ui/Button";
 import Card from "@/src/components/ui/Card";
+import { useEmoSenseStore } from "@/lib/store";
+import { useUserLogs } from "@/src/hooks/useUserLogs";
+import { getTheme } from "@/src/lib/emotionTheme";
+import { formatDistanceToNow } from "@/src/lib/formatDistance";
+import { addEmotionLog } from "@/src/lib/logRepository";
 
 type EmotionKey = "joy" | "calm" | "sadness" | "anger" | "fear" | "surprise";
 
@@ -103,6 +109,23 @@ function fuseSignals(face: SignalInput, voice: SignalInput, text: SignalInput): 
   return Object.values(scores).sort((a, b) => b.score - a.score);
 }
 
+const labelToKey: Record<string, EmotionKey> = {
+  Happy: "joy",
+  Calm: "calm",
+  Sad: "sadness",
+  Angry: "anger",
+  Scared: "fear",
+  Anxious: "fear",
+  Surprised: "surprise",
+};
+
+const voiceLabelToTone: Record<string, string> = {
+  "Low or quiet voice": "quiet",
+  "Steady voice": "steady",
+  "Expressive voice": "expressive",
+  "Activated voice": "activated",
+};
+
 function getConfidenceBand(score: number): string {
   if (score >= 65) return "Strong agreement";
   if (score >= 42) return "Moderate agreement";
@@ -116,6 +139,50 @@ export default function EmotionFusionPage() {
   const [voiceConfidence, setVoiceConfidence] = useState(65);
   const [text, setText] = useState("");
   const [showResult, setShowResult] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const user = useEmoSenseStore((s) => s.user);
+  const addToast = useEmoSenseStore((s) => s.addToast);
+  const lastVoiceTone = useEmoSenseStore((s) => s.lastVoiceTone);
+  const { emotionLogs, loading } = useUserLogs();
+  const lastScan = useMemo(() => emotionLogs.find((l) => l.source === "scan") ?? null, [emotionLogs]);
+  const [prefilled, setPrefilled] = useState(false);
+
+  // Start from the person's real latest face scan and voice check when available.
+  useEffect(() => {
+    if (loading || prefilled) return;
+    setPrefilled(true);
+    if (lastScan) {
+      const key = labelToKey[getTheme(lastScan.emotion).label];
+      if (key) setFaceEmotion(key);
+      if (lastScan.confidence != null) setFaceConfidence(Math.round(lastScan.confidence));
+    }
+    if (lastVoiceTone) {
+      const tone = voiceLabelToTone[lastVoiceTone.label];
+      if (tone) setVoiceTone(tone);
+      setVoiceConfidence(lastVoiceTone.confidence);
+    }
+  }, [loading, prefilled, lastScan, lastVoiceTone]);
+
+  async function saveResult() {
+    if (!user?.id || !top) return;
+    setSaving(true);
+    try {
+      await addEmotionLog({
+        userId: user.id,
+        emotion: top.emotion,
+        source: "manual",
+        confidence: Math.round(top.score),
+        note: ["Fusion result", text.trim()].filter(Boolean).join(": ").slice(0, 200),
+      });
+      setSaved(true);
+      addToast({ variant: "success", message: "Fusion result saved to your log." });
+    } catch {
+      addToast({ variant: "error", message: "Could not save the result." });
+    } finally {
+      setSaving(false);
+    }
+  }
 
   const textSignal = useMemo(() => scoreText(text), [text]);
   const voiceSignal = useMemo<SignalInput>(
@@ -157,6 +224,15 @@ export default function EmotionFusionPage() {
           <h2 className="font-display text-xl font-bold text-[var(--emotion-text,var(--text-primary))]">
             Face signal
           </h2>
+          <p className="text-xs text-[var(--text-muted)]">
+            {lastScan ? (
+              <>Prefilled from your last scan ({getTheme(lastScan.emotion).label}, {formatDistanceToNow(lastScan.logged_at)}).</>
+            ) : (
+              <>
+                No scan yet. <Link href="/emotion-scan" className="underline">Read a face</Link> to use a real result.
+              </>
+            )}
+          </p>
           <label className="block text-sm text-[var(--text-secondary)]">
             Detected emotion
             <select
@@ -188,6 +264,15 @@ export default function EmotionFusionPage() {
           <h2 className="font-display text-xl font-bold text-[var(--emotion-text,var(--text-primary))]">
             Voice signal
           </h2>
+          <p className="text-xs text-[var(--text-muted)]">
+            {lastVoiceTone ? (
+              <>Prefilled from your last voice check ({lastVoiceTone.label}, {formatDistanceToNow(lastVoiceTone.at)}).</>
+            ) : (
+              <>
+                No voice check yet. <Link href="/voice-tone" className="underline">Try voice tone</Link> to use a real result.
+              </>
+            )}
+          </p>
           <label className="block text-sm text-[var(--text-secondary)]">
             Tone result
             <select
@@ -236,7 +321,14 @@ export default function EmotionFusionPage() {
       </section>
 
       <div className="flex flex-col gap-3 sm:flex-row">
-        <Button type="button" onClick={() => setShowResult(true)} className="sm:flex-1">
+        <Button
+          type="button"
+          onClick={() => {
+            setShowResult(true);
+            setSaved(false);
+          }}
+          className="sm:flex-1"
+        >
           Fuse signals
         </Button>
         <Button
@@ -304,6 +396,16 @@ export default function EmotionFusionPage() {
                 <li key={reason}>{reason}</li>
               ))}
             </ul>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => void saveResult()}
+              loading={saving}
+              disabled={saved}
+              className="w-full"
+            >
+              {saved ? "Saved to your log" : "Save result to my log"}
+            </Button>
             <p className="border-t border-[var(--border)] pt-4 text-xs leading-relaxed text-[var(--text-muted)]">
               Fusion weights: face 45%, voice 30%, text 25%. This is an explainable support tool, not a diagnosis or clinical risk score.
             </p>

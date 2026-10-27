@@ -63,10 +63,20 @@ type EmoSenseStore = {
   recentActivity: ActivityItem[];
   addActivity: (item: Omit<ActivityItem, "id" | "timestamp">) => void;
 
+  lastVoiceTone: { label: string; confidence: number; at: string } | null;
+  setLastVoiceTone: (tone: { label: string; confidence: number } | null) => void;
+
+  /** Clear everything tied to the signed-in person (not device preferences). */
+  resetUserData: () => void;
+
   toasts: Toast[];
   addToast: (toast: Omit<Toast, "id">) => void;
   removeToast: (id: string) => void;
 };
+
+function localDayKey(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
 
 function applySensoryToDocument(s: SensoryPreferences) {
   if (typeof document === "undefined") return;
@@ -135,13 +145,13 @@ export const useEmoSenseStore = create<EmoSenseStore>()(
       lastStreakDate: null,
       dailyEmotions: [],
       incrementStreak: () => {
-        const today = new Date().toISOString().slice(0, 10);
+        const today = localDayKey(new Date());
         const last = get().lastStreakDate;
         if (last === today) return;
 
         const yesterday = new Date();
         yesterday.setDate(yesterday.getDate() - 1);
-        const yesterdayKey = yesterday.toISOString().slice(0, 10);
+        const yesterdayKey = localDayKey(yesterday);
 
         set({
           behaviourStreak: last === yesterdayKey ? get().behaviourStreak + 1 : 1,
@@ -149,7 +159,7 @@ export const useEmoSenseStore = create<EmoSenseStore>()(
         });
       },
       recordDailyEmotion: (emotion, source) => {
-        const today = new Date().toISOString().slice(0, 10);
+        const today = localDayKey(new Date());
         const next = [
           { date: today, emotion, source },
           ...get().dailyEmotions.filter((entry) => entry.date !== today),
@@ -158,31 +168,11 @@ export const useEmoSenseStore = create<EmoSenseStore>()(
         get().incrementStreak();
       },
 
-      weekEmotionSeries: [
-        { day: "Mon", count: 3 },
-        { day: "Tue", count: 5 },
-        { day: "Wed", count: 2 },
-        { day: "Thu", count: 4 },
-        { day: "Fri", count: 6 },
-        { day: "Sat", count: 3 },
-        { day: "Sun", count: 4 },
-      ],
-      lastScan: { emotion: "Calm", confidence: 82 },
+      weekEmotionSeries: [],
+      lastScan: null,
       setLastScan: (scan) => set({ lastScan: scan }),
 
-      recentActivity: [
-        {
-          id: "1",
-          timestamp: new Date().toISOString(),
-          emotion: "Calm",
-          note: "Quiet reading before bed",
-        },
-        {
-          id: "2",
-          timestamp: new Date(Date.now() - 86400000).toISOString(),
-          emotion: "Joy",
-        },
-      ],
+      recentActivity: [],
       addActivity: (item) =>
         set({
           recentActivity: [
@@ -193,6 +183,23 @@ export const useEmoSenseStore = create<EmoSenseStore>()(
             },
             ...get().recentActivity,
           ].slice(0, 50),
+        }),
+
+      lastVoiceTone: null,
+      setLastVoiceTone: (tone) =>
+        set({ lastVoiceTone: tone ? { ...tone, at: new Date().toISOString() } : null }),
+
+      resetUserData: () =>
+        set({
+          currentEmotion: null,
+          checkInSubmitted: false,
+          behaviourStreak: 0,
+          lastStreakDate: null,
+          dailyEmotions: [],
+          weekEmotionSeries: [],
+          lastScan: null,
+          recentActivity: [],
+          lastVoiceTone: null,
         }),
 
       toasts: [],
@@ -208,6 +215,19 @@ export const useEmoSenseStore = create<EmoSenseStore>()(
     }),
     {
       name: "emosense-store",
+      version: 2,
+      migrate: (persisted) => {
+        // v1 shipped with fake sample activity; drop it.
+        const state = (persisted ?? {}) as Partial<EmoSenseStore>;
+        return {
+          ...state,
+          recentActivity: (state.recentActivity ?? []).filter(
+            (a) => a.id !== "1" && a.id !== "2",
+          ),
+          weekEmotionSeries: [],
+          lastScan: null,
+        } as EmoSenseStore;
+      },
       partialize: (s) => ({
         user: s.user,
         sensory: s.sensory,
@@ -220,7 +240,7 @@ export const useEmoSenseStore = create<EmoSenseStore>()(
         dailyEmotions: s.dailyEmotions,
         lastScan: s.lastScan,
         recentActivity: s.recentActivity,
-        weekEmotionSeries: s.weekEmotionSeries,
+        lastVoiceTone: s.lastVoiceTone,
       }),
       onRehydrateStorage: () => (state) => {
         if (state?.sensory) applySensoryToDocument(state.sensory);

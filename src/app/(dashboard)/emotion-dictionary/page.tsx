@@ -39,6 +39,11 @@ export default function EmotionDictionaryPage() {
     void restoreTheme();
   }, [restoreTheme]);
 
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search).get("q");
+    if (q) setSearch(q.slice(0, 40));
+  }, []);
+
   const filtered = useMemo(() => {
     return emotions.filter((e) => {
       const q = search.trim().toLowerCase();

@@ -1,5 +1,3 @@
-@import url("https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500&family=JetBrains+Mono:wght@400&family=Nunito:wght@700;800&display=swap");
-
 @config "../../tailwind.config.ts";
 
 @import "tailwindcss";
@@ -22,10 +20,65 @@
   --text-muted: #4a5568;
   --border: rgba(91, 141, 239, 0.15);
   --glow: rgba(91, 141, 239, 0.08);
-  --font-display: "Nunito", sans-serif;
-  --font-body: "DM Sans", sans-serif;
-  --font-mono: "JetBrains Mono", monospace;
+  --font-display: var(--font-nunito, "Nunito"), system-ui, sans-serif;
+  --font-body: var(--font-dm-sans, "DM Sans"), system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains, "JetBrains Mono"), ui-monospace, monospace;
   --transition: 300ms ease-out;
+}
+
+html {
+  font-size: calc(100% * var(--font-scale, 1));
+}
+
+html[data-theme="light"],
+html[data-theme="light-hc"] {
+  color-scheme: light;
+  --emotion-bg: #f6f8fc;
+  --emotion-surface: #ffffff;
+  --emotion-accent: #3b6fd8;
+  --emotion-text: #111827;
+  --bg-base: #f6f8fc;
+  --bg-surface: #ffffff;
+  --bg-elevated: #eef2f8;
+  --accent-primary: #3b6fd8;
+  --text-primary: #111827;
+  --text-secondary: #4b5563;
+  --text-muted: #6b7280;
+  --border: rgba(30, 41, 59, 0.14);
+  --glow: rgba(59, 111, 216, 0.1);
+}
+
+html[data-theme="light-hc"] {
+  --emotion-text: #000000;
+  --text-primary: #000000;
+  --text-secondary: #1f2937;
+  --text-muted: #374151;
+  --border: rgba(0, 0, 0, 0.45);
+  --accent-primary: #1d4ed8;
+  --emotion-accent: #1d4ed8;
+}
+
+html[data-contrast="high"] {
+  --text-secondary: #c5d0e0;
+  --text-muted: #9aa8bd;
+  --border: rgba(237, 242, 255, 0.35);
+}
+
+html[data-theme^="light"][data-contrast="high"] {
+  --text-secondary: #1f2937;
+  --text-muted: #374151;
+  --border: rgba(0, 0, 0, 0.45);
+}
+
+html[data-contrast="low"] {
+  --text-primary: #c9d2e3;
+  --text-secondary: #7c8ba3;
+  --border: rgba(91, 141, 239, 0.1);
+}
+
+html[data-theme^="light"][data-contrast="low"] {
+  --text-primary: #374151;
+  --text-secondary: #6b7280;
 }
 
 [data-emotion="joy"],
@@ -164,6 +217,19 @@
   --emotion-face-bg: #ff8a65;
 }
 
+
+/* Emotion themes use light pastel surfaces; derive readable text, border,
+   and input colours from each theme's own text colour. */
+body[data-emotion] {
+  --text-primary: var(--emotion-text);
+  --text-secondary: color-mix(in srgb, var(--emotion-text) 78%, transparent);
+  --text-muted: color-mix(in srgb, var(--emotion-text) 60%, transparent);
+  --border: color-mix(in srgb, var(--emotion-text) 16%, transparent);
+  --glow: color-mix(in srgb, var(--emotion-accent) 14%, transparent);
+  --bg-base: color-mix(in srgb, var(--emotion-bg) 70%, #ffffff);
+  --bg-elevated: color-mix(in srgb, var(--emotion-surface) 85%, var(--emotion-text) 6%);
+}
+
 body {
   transition:
     background-color 600ms ease-out,
@@ -184,16 +250,12 @@ body {
   }
 }
 
-[data-font-size="large"] {
-  font-size: 18px;
-}
-
-[data-font-size="xl"] {
-  font-size: 20px;
-}
-
-[data-contrast="high"] {
-  --text-secondary: #c5d0e0;
+[data-motion="reduced"] *,
+[data-motion="reduced"] *::before,
+[data-motion="reduced"] *::after {
+  animation-duration: 0.2s !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.15s !important;
 }
 
 [data-motion="none"] * {
@@ -243,4 +305,12 @@ body {
 
 .phone-float-delay-2 {
   animation-delay: 1s;
+}
+
+@media print {
+  html,
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
 }

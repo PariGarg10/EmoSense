@@ -1,36 +1,7 @@
 import { createClient as createSupabaseClient, type SupabaseClient } from "@supabase/supabase-js";
+import { resolveSupabaseUrl } from "@/src/lib/supabaseEnv";
 
 let browserClient: SupabaseClient | null = null;
-
-function projectRefFromAnonKey(key: string): string | null {
-  try {
-    const payload = key.split(".")[1];
-    if (!payload) return null;
-    const json = JSON.parse(atob(payload.replace(/-/g, "+").replace(/_/g, "/")));
-    return typeof json.ref === "string" ? json.ref : null;
-  } catch {
-    return null;
-  }
-}
-
-function resolveSupabaseUrl(rawUrl: string | undefined, anonKey: string): string | null {
-  const ref = projectRefFromAnonKey(anonKey);
-  const expected = ref ? `https://${ref}.supabase.co` : null;
-
-  const trimmed = rawUrl?.trim() ?? "";
-  if (trimmed.startsWith("https://") && trimmed.includes(".supabase.co")) {
-    const normalized = trimmed.replace(/\/$/, "");
-    if (expected && normalized !== expected) {
-      console.warn(
-        `[EmoSense] NEXT_PUBLIC_SUPABASE_URL does not match anon key project ref. Using ${expected}`,
-      );
-      return expected;
-    }
-    return normalized;
-  }
-
-  return expected;
-}
 
 /** Browser Supabase client; returns null when env vars are missing or invalid. */
 export function createClient(): SupabaseClient | null {
@@ -59,4 +30,40 @@ export function resetSupabaseClient() {
 
 export function getSupabaseBrowserClient(): SupabaseClient | null {
   return createClient();
+}
+
+/**
+ * Finish an email link (confirmation, magic link, password recovery) by
+ * exchanging the `?code=` or `#access_token` in the URL for a session.
+ */
+export async function establishSessionFromUrl(
+  supabase: SupabaseClient,
+): Promise<{ error: string | null }> {
+  const params = new URLSearchParams(window.location.search);
+  const errorDescription =
+    params.get("error_description") ??
+    new URLSearchParams(window.location.hash.replace(/^#/, "")).get("error_description");
+  if (errorDescription) return { error: errorDescription };
+
+  const code = params.get("code");
+  if (code) {
+    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    return { error: error?.message ?? null };
+  }
+
+  const hash = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+  const accessToken = hash.get("access_token");
+  const refreshToken = hash.get("refresh_token");
+  if (accessToken && refreshToken) {
+    const { error } = await supabase.auth.setSession({
+      access_token: accessToken,
+      refresh_token: refreshToken,
+    });
+    // Drop tokens from the address bar and history.
+    window.history.replaceState(null, "", window.location.pathname);
+    return { error: error?.message ?? null };
+  }
+
+  const { data } = await supabase.auth.getSession();
+  return { error: data.session ? null : "This link is invalid or has expired." };
 }

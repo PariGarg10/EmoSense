@@ -6,7 +6,7 @@ import Button from "@/src/components/ui/Button";
 import Card from "@/src/components/ui/Card";
 import EmotionFace from "@/src/components/emotion/EmotionFace";
 import { applyEmotionTheme, getTheme } from "@/src/lib/emotionTheme";
-import { insertBehaviourLog } from "@/src/lib/behaviourLogs";
+import { addBehaviourLog } from "@/src/lib/logRepository";
 import { useEmoSenseStore } from "@/lib/store";
 
 const timeOptions = ["Morning", "Afternoon", "Evening", "Night"] as const;
@@ -28,6 +28,14 @@ const emotionOptions = [
   { key: "anger", label: "Anger" },
   { key: "confusion", label: "Confused" },
 ] as const;
+
+function currentTimeOfDay(): (typeof timeOptions)[number] {
+  const h = new Date().getHours();
+  if (h >= 5 && h < 12) return "Morning";
+  if (h >= 12 && h < 17) return "Afternoon";
+  if (h >= 17 && h < 21) return "Evening";
+  return "Night";
+}
 
 function EnergyBattery({ level }: { level: number }) {
   return (
@@ -76,7 +84,7 @@ export default function BehaviourTrackerForm() {
   const recordDailyEmotion = useEmoSenseStore((s) => s.recordDailyEmotion);
 
   const [timeOfDay, setTimeOfDay] =
-    useState<(typeof timeOptions)[number]>("Morning");
+    useState<(typeof timeOptions)[number]>(currentTimeOfDay);
   const [selectedEmotion, setSelectedEmotion] = useState("");
   const [selectedActivities, setSelectedActivities] = useState<string[]>([]);
   const [energyLevel, setEnergyLevel] = useState(3);
@@ -109,11 +117,12 @@ export default function BehaviourTrackerForm() {
       addToast({ variant: "info", message: "Pick one emotion before saving." });
       return;
     }
+    if (!user?.id) return;
     setSaving(true);
     const label = getTheme(selectedEmotion).label;
 
-    if (user?.id) {
-      await insertBehaviourLog({
+    try {
+      await addBehaviourLog({
         userId: user.id,
         timeOfDay,
         emotion: selectedEmotion,
@@ -121,18 +130,21 @@ export default function BehaviourTrackerForm() {
         energyLevel,
         note: note.trim() || undefined,
       });
+      addActivity({
+        emotion: label,
+        note: [timeOfDay, ...selectedActivities, `Energy ${energyLevel}/5`, note]
+          .filter(Boolean)
+          .join(" · "),
+      });
+      recordDailyEmotion(selectedEmotion, "tracker");
+      addToast({ variant: "success", message: "Mood entry saved." });
+      setNote("");
+      setSelectedActivities([]);
+    } catch {
+      addToast({ variant: "error", message: "Could not save this entry. Please try again." });
+    } finally {
+      setSaving(false);
     }
-
-    addActivity({
-      emotion: label,
-      note: [timeOfDay, ...selectedActivities, `Energy ${energyLevel}/5`, note]
-        .filter(Boolean)
-        .join(" · "),
-    });
-    recordDailyEmotion(selectedEmotion, "tracker");
-    addToast({ variant: "success", message: "Behaviour log saved." });
-    setNote("");
-    setSaving(false);
   }
 
   return (

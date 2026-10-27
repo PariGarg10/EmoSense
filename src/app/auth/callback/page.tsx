@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { goToDashboard, markSignedIn } from "@/src/lib/authGate";
-import { createClient } from "@/src/lib/supabase";
+import { completeSignIn, sessionFromSupabaseUser } from "@/src/lib/authGate";
+import { createClient, establishSessionFromUrl } from "@/src/lib/supabase";
 
 export default function AuthCallbackPage() {
   const router = useRouter();
@@ -18,63 +18,18 @@ export default function AuthCallbackPage() {
     }
 
     let active = true;
-
-    async function finish() {
-      if (!supabase) return;
-
-      const params = new URLSearchParams(window.location.search);
-      const code = params.get("code");
-
-      if (code) {
-        const { error } = await supabase.auth.exchangeCodeForSession(code);
-        if (!active) return;
-        if (error) {
-          setMessage(error.message);
-          router.replace("/login");
-          return;
-        }
-        markSignedIn("supabase");
-        goToDashboard();
-        return;
-      }
-
-      const hash = window.location.hash.startsWith("#")
-        ? window.location.hash.slice(1)
-        : window.location.hash;
-      if (hash) {
-        const hashParams = new URLSearchParams(hash);
-        const accessToken = hashParams.get("access_token");
-        const refreshToken = hashParams.get("refresh_token");
-        if (accessToken && refreshToken) {
-          const { error } = await supabase.auth.setSession({
-            access_token: accessToken,
-            refresh_token: refreshToken,
-          });
-          if (!active) return;
-          if (error) {
-            setMessage(error.message);
-            router.replace("/login");
-            return;
-          }
-          markSignedIn("supabase");
-          goToDashboard();
-          return;
-        }
-      }
-
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+    void (async () => {
+      const { error } = await establishSessionFromUrl(supabase);
       if (!active) return;
-      if (session) {
-        markSignedIn("supabase");
-        goToDashboard();
+      const { data } = await supabase.auth.getUser();
+      if (error || !data.user) {
+        setMessage(error ?? "Could not sign you in.");
+        window.setTimeout(() => router.replace("/login"), 2000);
         return;
       }
-      router.replace("/login");
-    }
-
-    finish();
+      completeSignIn(sessionFromSupabaseUser(data.user));
+      window.location.replace("/dashboard");
+    })();
 
     return () => {
       active = false;

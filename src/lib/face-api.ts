@@ -4,6 +4,7 @@
 import * as faceapi from "face-api.js";
 
 let modelsLoaded = false;
+let loading: Promise<void> | null = null;
 
 /** Pinned release so CDN URLs stay stable. */
 const CDN_WEIGHTS_BASE =
@@ -13,44 +14,52 @@ const WEIGHT_URIS = ["/models", CDN_WEIGHTS_BASE] as const;
 
 async function loadModelsFromUri(baseUri: string): Promise<void> {
   const base = baseUri.replace(/\/$/, "");
+  // Only the detector and expression nets are needed (landmarks are unused).
   await Promise.all([
     faceapi.nets.tinyFaceDetector.loadFromUri(base),
     faceapi.nets.faceExpressionNet.loadFromUri(base),
-    faceapi.nets.faceLandmark68TinyNet.loadFromUri(base),
   ]);
 }
 
 export async function loadModels(): Promise<void> {
   if (modelsLoaded) return;
-  let lastError: unknown;
-  for (const uri of WEIGHT_URIS) {
-    try {
-      await loadModelsFromUri(uri);
-      modelsLoaded = true;
-      return;
-    } catch (e) {
-      lastError = e;
+  // De-duplicate concurrent callers (camera boot + upload tab + prefetch).
+  loading ??= (async () => {
+    let lastError: unknown;
+    for (const uri of WEIGHT_URIS) {
+      try {
+        await loadModelsFromUri(uri);
+        modelsLoaded = true;
+        return;
+      } catch (e) {
+        lastError = e;
+      }
     }
+    throw lastError instanceof Error ? lastError : new Error(String(lastError));
+  })();
+  try {
+    await loading;
+  } finally {
+    if (!modelsLoaded) loading = null;
   }
-  throw lastError instanceof Error ? lastError : new Error(String(lastError));
 }
 
 /** For “Retry” after a failed load (e.g. offline then back online). */
 export function resetFaceModelsLoaded(): void {
   modelsLoaded = false;
+  loading = null;
 }
 
+// 320px input is ~2x faster than the 416 default and accurate enough for webcams.
+const videoOptions = new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.5 });
+const imageOptions = new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.4 });
+
 async function detectFromVideo(videoEl: HTMLVideoElement) {
-  return faceapi
-    .detectSingleFace(videoEl, new faceapi.TinyFaceDetectorOptions())
-    .withFaceLandmarks(true)
-    .withFaceExpressions();
+  return faceapi.detectSingleFace(videoEl, videoOptions).withFaceExpressions();
 }
 
 async function detectFromImage(imgEl: HTMLImageElement) {
-  return faceapi
-    .detectSingleFace(imgEl, new faceapi.TinyFaceDetectorOptions())
-    .withFaceExpressions();
+  return faceapi.detectSingleFace(imgEl, imageOptions).withFaceExpressions();
 }
 
 function getTopEmotion(expressions: faceapi.FaceExpressions): {
